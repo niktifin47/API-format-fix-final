@@ -61,6 +61,19 @@ def _normalize_suffix(format_name: str) -> str:
     return suffix if suffix.startswith(".") else f".{suffix}"
 
 
+def _safe_resolve_path(user_path: str | Path, root: Path) -> Path:
+    candidate = Path(user_path)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    resolved_root = root.resolve()
+    resolved_candidate = candidate.resolve()
+    try:
+        resolved_candidate.relative_to(resolved_root)
+    except ValueError as error:
+        raise ValueError(f"Path {user_path!r} is outside the allowed directory {str(root)!r}.") from error
+    return resolved_candidate
+
+
 def _load_binary_document(source: Path | BinaryIO, suffix: str) -> Document:
     if suffix == ".docx":
         try:
@@ -366,8 +379,9 @@ def format_file(
     color_scheme: str | ColorScheme | None = None,
 ) -> Path:
     """Read a supported document, apply a preset, and write the requested format."""
-    source = Path(input_path)
-    destination = Path(output_path)
+    safe_root = Path.cwd()
+    source = _safe_resolve_path(input_path, safe_root)
+    destination = _safe_resolve_path(output_path, safe_root)
     suffix = _normalize_suffix(destination.suffix)
     if suffix not in _SUPPORTED_OUTPUTS:
         raise ValueError(f"Unsupported output format {suffix or '(no extension)'!r}.")
