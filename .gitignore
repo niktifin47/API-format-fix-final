@@ -9,6 +9,9 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+.gradle/
+local.properties
+android/build/
 develop-eggs/
 dist/
 downloads/

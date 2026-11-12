@@ -1,5 +1,6 @@
 import argparse
 import sys
+import traceback
 
 from .models import COLOR_SCHEMES, PRESETS
 from .renderer import format_file
@@ -17,6 +18,7 @@ def main() -> None:
     parser.add_argument(
         "--list-presets", action="store_true", help="List built-in presets and color schemes"
     )
+    parser.add_argument("--debug", action="store_true", help="Show a traceback if formatting fails")
     args = parser.parse_args()
 
     if args.list_presets:
@@ -32,6 +34,9 @@ def main() -> None:
     try:
         format_file(args.input, args.output, preset=args.preset, color_scheme=args.color_scheme)
     except (ImportError, OSError, ValueError) as error:
+        if args.debug:
+            traceback.print_exc()
+            raise SystemExit(1) from error
         parser.error(str(error))
     print(f"Formatted {args.input} -> {args.output}")
 
