@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  python-distributions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/*
+
+  windows-app:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install ".[all,windows]"
+      - run: python -m PyInstaller --clean --onefile --name api-format-fix --collect-all reportlab --collect-all docx --collect-all pypdf scripts\windows_entry.py
+      - run: Compress-Archive -Path dist\api-format-fix.exe -DestinationPath dist\api-format-fix-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: dist\api-format-fix-windows-x64.zip
+
+  publish:
+    needs: [python-distributions, windows-app]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: release-assets/python
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-app
+          path: release-assets/windows
+      - name: Generate Winget manifests
+        env:
+          VERSION: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          VERSION="${VERSION#v}"
+          python scripts/create_winget_manifests.py \
+            --version "$VERSION" \
+            --asset release-assets/windows/api-format-fix-windows-x64.zip \
+            --release-url "https://github.com/${REPOSITORY}/releases/download/v${VERSION}/api-format-fix-windows-x64.zip" \
+            --output-dir release-assets/winget
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/**/*
+

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "api-format-fix"
+version = "0.1.0"
+description = "Apply reusable styles to Markdown, CV, DOCX, and PDF documents."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+authors = [{ name = "niktifin47" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Markup",
+]
+dependencies = []
+
+[project.optional-dependencies]
+docx = ["python-docx>=1.1"]
+pdf = ["pypdf>=4", "reportlab>=4"]
+all = ["python-docx>=1.1", "pypdf>=4", "reportlab>=4"]
+dev = ["pytest>=8", "ruff>=0.6", "build>=1"]
+windows = ["pyinstaller>=6"]
+
+[project.scripts]
+api-format-fix = "api_format_fix.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
