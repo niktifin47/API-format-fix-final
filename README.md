@@ -40,6 +40,7 @@ format_file(
 ```
 
 The `.cv` extension is treated as Markdown text, so headings and lists can be used in a CV source file.
+`format_file` uses the paths supplied by the caller, including absolute paths outside the current working directory. Applications that accept paths from untrusted users should validate and constrain them to an allowed directory before calling the library.
 
 Use the command line:
 

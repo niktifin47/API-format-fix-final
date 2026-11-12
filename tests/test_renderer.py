@@ -19,6 +19,17 @@ def test_cv_input_can_be_styled_as_html(tmp_path: Path):
     assert "#17365d" in rendered
 
 
+def test_format_file_accepts_paths_outside_the_working_directory(tmp_path: Path):
+    source = tmp_path / "input.md"
+    destination = tmp_path / "output.html"
+    source.write_text("# Summary", encoding="utf-8")
+
+    result = format_file(source, destination)
+
+    assert result == destination
+    assert "<h1>Summary</h1>" in destination.read_text(encoding="utf-8")
+
+
 def test_custom_template_and_palette_are_supported(tmp_path: Path):
     source = tmp_path / "input.md"
     destination = tmp_path / "output.html"
