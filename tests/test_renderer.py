@@ -1,8 +1,9 @@
+import builtins
 from pathlib import Path
 
 import pytest
 
-from api_format_fix import ColorScheme, Template, format_file
+from api_format_fix import ColorScheme, Template, format_content, format_file
 
 
 def test_cv_input_can_be_styled_as_html(tmp_path: Path):
@@ -77,3 +78,53 @@ def test_docx_and_pdf_outputs_are_created(tmp_path: Path):
     assert "First item" in docx_html.read_text(encoding="utf-8")
     assert "Summary" in pdf_html.read_text(encoding="utf-8")
     assert "First item" in pdf_html.read_text(encoding="utf-8")
+
+
+def test_in_memory_api_round_trips_docx_and_pdf_bytes():
+    html = format_content("# Summary", "md", "html")
+    assert isinstance(html, str)
+    assert "<h1>Summary</h1>" in html
+
+    source = b"# Summary\n\n- First item"
+
+    docx_data = format_content(source, "md", ".docx")
+    assert isinstance(docx_data, bytes)
+    docx_html = format_content(docx_data, "docx", "html")
+    assert isinstance(docx_html, str)
+    assert "<h1>Summary</h1>" in docx_html
+    assert "<li>First item</li>" in docx_html
+
+    pdf_data = format_content(source, ".md", "pdf")
+    assert isinstance(pdf_data, bytes)
+    pdf_markdown = format_content(pdf_data, ".pdf", "md")
+    assert isinstance(pdf_markdown, str)
+    assert "Summary" in pdf_markdown
+    assert "First item" in pdf_markdown
+
+
+@pytest.mark.parametrize(
+    ("module", "input_data", "input_format", "output_format", "dependency"),
+    [
+        ("docx", b"document", "docx", "md", "python-docx"),
+        ("pypdf", b"document", "pdf", "md", "pypdf"),
+        ("reportlab", b"# Resume", "md", "pdf", "ReportLab"),
+    ],
+)
+def test_in_memory_api_reports_missing_optional_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+    module: str,
+    input_data: bytes,
+    input_format: str,
+    output_format: str,
+    dependency: str,
+):
+    original_import = builtins.__import__
+
+    def import_without_optional_dependency(name, *args, **kwargs):
+        if name == module or name.startswith(f"{module}."):
+            raise ModuleNotFoundError(f"No module named {name!r}")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_optional_dependency)
+    with pytest.raises(ImportError, match=dependency):
+        format_content(input_data, input_format, output_format)

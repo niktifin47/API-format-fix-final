@@ -1,7 +1,9 @@
 import html
 import math
 import re
+from io import BytesIO
 from pathlib import Path
+from typing import BinaryIO
 from xml.sax.saxutils import escape
 
 from .models import COLOR_SCHEMES, PRESETS, ColorScheme, Document, DocumentBlock, Template
@@ -52,13 +54,14 @@ def _resolve_template(
     return template, colors
 
 
-def _load_document(path: Path) -> Document:
-    suffix = path.suffix.lower()
-    if suffix not in _SUPPORTED_INPUTS:
-        raise ValueError(f"Unsupported input format {suffix or '(no extension)'!r}.")
+def _normalize_suffix(format_name: str) -> str:
+    suffix = format_name.lower()
+    if not suffix:
+        return ""
+    return suffix if suffix.startswith(".") else f".{suffix}"
 
-    if suffix in {".md", ".cv", ".txt"}:
-        return parse_markdown(path.read_text(encoding="utf-8"))
+
+def _load_binary_document(source: Path | BinaryIO, suffix: str) -> Document:
     if suffix == ".docx":
         try:
             from docx import Document as WordDocument
@@ -67,7 +70,7 @@ def _load_document(path: Path) -> Document:
                 "Reading DOCX requires python-docx. Install it with `pip install python-docx`."
             ) from error
 
-        word_document = WordDocument(path)
+        word_document = WordDocument(source)
         blocks = []
         for paragraph in word_document.paragraphs:
             if not paragraph.text.strip():
@@ -95,9 +98,19 @@ def _load_document(path: Path) -> Document:
             "Reading PDF requires pypdf. Install it with `pip install pypdf`."
         ) from error
 
-    reader = PdfReader(path)
+    reader = PdfReader(source)
     text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
     return parse_markdown(text)
+
+
+def _load_document(path: Path) -> Document:
+    suffix = path.suffix.lower()
+    if suffix not in _SUPPORTED_INPUTS:
+        raise ValueError(f"Unsupported input format {suffix or '(no extension)'!r}.")
+
+    if suffix in {".md", ".cv", ".txt"}:
+        return parse_markdown(path.read_text(encoding="utf-8"))
+    return _load_binary_document(path, suffix)
 
 
 def _inline_html(text: str) -> str:
@@ -183,7 +196,7 @@ def _render_markdown(document: Document) -> str:
 
 
 def _render_docx(
-    document: Document, template: Template, colors: ColorScheme, output_path: Path
+    document: Document, template: Template, colors: ColorScheme, output_path: Path | BinaryIO
 ) -> None:
     try:
         from docx import Document as WordDocument
@@ -223,7 +236,7 @@ def _render_docx(
 
 
 def _render_pdf(
-    document: Document, template: Template, colors: ColorScheme, output_path: Path
+    document: Document, template: Template, colors: ColorScheme, output_path: Path | BinaryIO
 ) -> None:
     try:
         from reportlab.lib import colors as pdf_colors
@@ -277,7 +290,8 @@ def _render_pdf(
             ordered_number = 0
             story.append(Paragraph(escape(block.text), body_style))
             story.append(Spacer(1, 6))
-    SimpleDocTemplate(str(output_path), pagesize=LETTER).build(story)
+    target = str(output_path) if isinstance(output_path, Path) else output_path
+    SimpleDocTemplate(target, pagesize=LETTER).build(story)
 
 
 def render_document(
@@ -287,9 +301,7 @@ def render_document(
     color_scheme: str | ColorScheme | None = None,
 ) -> str | None:
     """Render a document as text/HTML, or return None for file-based formats."""
-    suffix = output_format.lower()
-    if not suffix.startswith("."):
-        suffix = f".{suffix}"
+    suffix = _normalize_suffix(output_format) or "."
     if suffix not in _SUPPORTED_OUTPUTS:
         raise ValueError(
             f"Unsupported output format {suffix!r}. Choose from: {', '.join(sorted(_SUPPORTED_OUTPUTS))}"
@@ -303,6 +315,50 @@ def render_document(
     raise ValueError(f"Output format {suffix!r} requires a destination path. Use format_file().")
 
 
+def format_content(
+    input_data: str | bytes,
+    input_format: str,
+    output_format: str,
+    preset: str | Template = "formal",
+    color_scheme: str | ColorScheme | None = None,
+) -> str | bytes:
+    """Format in-memory content; text outputs are strings and DOCX/PDF outputs are bytes."""
+    input_suffix = _normalize_suffix(input_format)
+    output_suffix = _normalize_suffix(output_format)
+    if input_suffix not in _SUPPORTED_INPUTS:
+        raise ValueError(f"Unsupported input format {input_suffix or '(no extension)'!r}.")
+    if output_suffix not in _SUPPORTED_OUTPUTS:
+        raise ValueError(
+            f"Unsupported output format {output_suffix or '(no extension)'!r}. "
+            f"Choose from: {', '.join(sorted(_SUPPORTED_OUTPUTS))}"
+        )
+
+    if isinstance(input_data, str):
+        if input_suffix not in {".md", ".cv", ".txt"}:
+            raise TypeError(f"Input for {input_suffix} must be bytes.")
+        document = parse_markdown(input_data)
+    elif isinstance(input_data, bytes):
+        if input_suffix in {".md", ".cv", ".txt"}:
+            document = parse_markdown(input_data.decode("utf-8"))
+        else:
+            document = _load_binary_document(BytesIO(input_data), input_suffix)
+    else:
+        raise TypeError("input_data must be str or bytes.")
+
+    template, colors = _resolve_template(preset, color_scheme)
+    if output_suffix in {".md", ".cv"}:
+        return _render_markdown(document)
+    if output_suffix == ".html":
+        return _render_html(document, template, colors)
+
+    output = BytesIO()
+    if output_suffix == ".docx":
+        _render_docx(document, template, colors, output)
+    else:
+        _render_pdf(document, template, colors, output)
+    return output.getvalue()
+
+
 def format_file(
     input_path: str | Path,
     output_path: str | Path,
@@ -312,7 +368,7 @@ def format_file(
     """Read a supported document, apply a preset, and write the requested format."""
     source = Path(input_path)
     destination = Path(output_path)
-    suffix = destination.suffix.lower()
+    suffix = _normalize_suffix(destination.suffix)
     if suffix not in _SUPPORTED_OUTPUTS:
         raise ValueError(f"Unsupported output format {suffix or '(no extension)'!r}.")
 
