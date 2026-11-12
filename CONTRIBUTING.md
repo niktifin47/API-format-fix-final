@@ -7,3 +7,5 @@
 5. Open a pull request against `main`; GitHub Actions runs the same checks.
 
 Document input is untrusted. Keep output escaping and explicit optional-dependency errors intact.
+
+Tagged releases attach Python distributions, a Windows CLI ZIP, and generated Winget manifests. Winget publication requires submitting the generated manifests to Microsoft's `winget-pkgs` repository.

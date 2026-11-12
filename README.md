@@ -18,6 +18,14 @@ For development:
 python -m pip install -e ".[all,dev]"
 ```
 
+For a tagged GitHub Release, install the wheel directly without publishing this project to PyPI:
+
+```shell
+python -m pip install "api-format-fix[all] @ https://github.com/niktifin47/API-format-fix-final/releases/download/v0.1.0/api_format_fix-0.1.0-py3-none-any.whl"
+```
+
+Pip still downloads the optional format dependencies from its configured package index.
+
 ## Quick start
 
 ```python
@@ -67,6 +75,8 @@ python -m build
 ```
 
 Pull requests run the same checks in GitHub Actions. Pushing a `v*` tag builds source and wheel distributions and attaches them to a GitHub Release. Publishing to PyPI is not configured by default.
+
+The same release workflow also builds a self-contained Windows CLI ZIP and generates Winget manifests with its release URL and SHA-256. Submit those manifests to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to make `winget install niktifin47.APIFormatFix` available after Microsoft accepts the package.
 
 ## License
 

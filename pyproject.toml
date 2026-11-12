@@ -30,6 +30,7 @@ docx = ["python-docx>=1.1"]
 pdf = ["pypdf>=4", "reportlab>=4"]
 all = ["python-docx>=1.1", "pypdf>=4", "reportlab>=4"]
 dev = ["pytest>=8", "ruff>=0.6", "build>=1"]
+windows = ["pyinstaller>=6"]
 
 [project.scripts]
 api-format-fix = "api_format_fix.cli:main"
