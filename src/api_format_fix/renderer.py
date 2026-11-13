@@ -225,7 +225,13 @@ def _load_binary_document(
                 "Reading RTF requires striprtf. Install it with `pip install api-format-fix[rtf]`."
             ) from error
         raw = source.read_bytes() if isinstance(source, Path) else source.read()
-        return parse_markdown(rtf_to_text(raw.decode("ascii", errors="replace")))
+        codepage = re.search(rb"\\ansicpg(\d+)", raw)
+        encoding = f"cp{codepage.group(1).decode('ascii')}" if codepage else "cp1252"
+        try:
+            rtf_text = raw.decode(encoding)
+        except (LookupError, UnicodeDecodeError) as error:
+            raise DocumentParseError(f"Could not decode RTF document using {encoding}.") from error
+        return parse_markdown(rtf_to_text(rtf_text, encoding=encoding))
 
     if suffix == ".odt":
         try:
