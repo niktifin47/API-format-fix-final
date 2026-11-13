@@ -229,9 +229,10 @@ def _load_binary_document(
 
     if suffix == ".odt":
         try:
+            from xml.parsers.expat import ExpatError
+
             from odf.opendocument import load
             from odf.teletype import extractText
-            from xml.parsers.expat import ExpatError
         except ImportError as error:
             raise ImportError(
                 "Reading ODT requires odfpy. Install it with `pip install api-format-fix[odt]`."
