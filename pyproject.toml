@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "api-format-fix"
 version = "0.1.0"
-description = "Apply reusable styles to Markdown, CV, DOCX, and PDF documents."
+description = "Extract and restyle text from common document formats."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"
@@ -29,7 +29,15 @@ dependencies = []
 [project.optional-dependencies]
 docx = ["python-docx>=1.1"]
 pdf = ["pypdf>=4", "reportlab>=4"]
-all = ["python-docx>=1.1", "pypdf>=4", "reportlab>=4"]
+rtf = ["striprtf>=0.0.26"]
+odt = ["odfpy>=1.4.1"]
+all = [
+    "python-docx>=1.1",
+    "pypdf>=4",
+    "reportlab>=4",
+    "striprtf>=0.0.26",
+    "odfpy>=1.4.1",
+]
 dev = ["pytest>=8", "ruff>=0.6", "build>=1"]
 windows = ["pyinstaller>=6"]
 
