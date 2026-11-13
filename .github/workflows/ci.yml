@@ -27,6 +27,36 @@ jobs:
       - run: python -m pytest
       - run: python -m build
 
+  linux-distros:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu:22.04, ubuntu:24.04, debian:bookworm, fedora:latest]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test in Linux distribution container
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            "$IMAGE" \
+            bash -c '
+              if command -v apt-get >/dev/null 2>&1; then
+                apt-get update
+                apt-get install -y python3 python3-pip python3-venv
+              else
+                dnf install -y python3 python3-pip
+              fi
+              python3 -m venv /tmp/api-format-fix-venv
+              /tmp/api-format-fix-venv/bin/python -m pip install -e ".[all,dev]"
+              /tmp/api-format-fix-venv/bin/python -m ruff check .
+              /tmp/api-format-fix-venv/bin/python -m pytest
+              /tmp/api-format-fix-venv/bin/python -m build
+            '
+
   android:
     runs-on: ubuntu-latest
     steps:
@@ -40,4 +70,45 @@ jobs:
           packages: platform-tools
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - run: bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug --no-daemon
+
+  failure-diagnostics:
+    if: ${{ always() && (needs.test.result == 'failure' || needs.linux-distros.result == 'failure' || needs.android.result == 'failure') }}
+    needs: [test, linux-distros, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[all,dev]"
+      - name: Rerun Python checks with detailed diagnostics
+        if: ${{ needs.test.result == 'failure' || needs.linux-distros.result == 'failure' }}
+        shell: bash
+        run: |
+          set +e
+          python -m ruff check . --output-format=concise
+          ruff_status=$?
+          python -m pytest -vv --tb=long
+          pytest_status=$?
+          python -m build
+          build_status=$?
+          {
+            echo "## Python failure diagnostics (Ubuntu / Python 3.12)"
+            echo "| Check | Exit status |"
+            echo "| --- | ---: |"
+            echo "| Ruff | $ruff_status |"
+            echo "| pytest | $pytest_status |"
+            echo "| build | $build_status |"
+            echo
+            echo "Compare this rerun with the original failing OS/Python matrix job; a passing rerun does not rule out a platform-specific failure."
+            echo "Review the independent CodeQL workflow results for security findings. A test/build failure alone does not establish whether a change is safe."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+      - name: Add Android failure triage guidance
+        if: ${{ needs.android.result == 'failure' }}
+        run: |
+          {
+            echo "## Android failure triage"
+            echo "Review the Android job's first failing Gradle task and its stack trace. Compare with the Android CodeQL workflow result; CI failures are not themselves a security assessment."
+          } >> "$GITHUB_STEP_SUMMARY"
 

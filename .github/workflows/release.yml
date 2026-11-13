@@ -62,6 +62,11 @@ jobs:
             --asset release-assets/windows/api-format-fix-windows-x64.zip \
             --release-url "https://github.com/${REPOSITORY}/releases/download/v${VERSION}/api-format-fix-windows-x64.zip" \
             --output-dir release-assets/winget
+      - name: Generate release checksums
+        run: |
+          find release-assets -type f ! -name SHA256SUMS.txt -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > release-assets/SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: release-assets/**/*

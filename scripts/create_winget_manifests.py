@@ -57,7 +57,7 @@ PackageLocale: en-US
 Publisher: niktifin47
 PackageName: API Format Fix
 License: BSD-3-Clause
-ShortDescription: Apply reusable styles to Markdown, CV, DOCX, and PDF documents.
+ShortDescription: Extract and restyle text from common document formats.
 PackageUrl: {REPOSITORY_URL}
 ReleaseNotesUrl: {REPOSITORY_URL}/releases/tag/v{version}
 ManifestType: defaultLocale

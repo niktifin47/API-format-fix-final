@@ -1,20 +1,71 @@
 import html
 import math
 import re
+from collections.abc import Mapping
+from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
+from types import MappingProxyType
 from typing import BinaryIO
 from xml.sax.saxutils import escape
+from zipfile import BadZipFile
 
-from .models import COLOR_SCHEMES, PRESETS, ColorScheme, Document, DocumentBlock, Template
-from .parser import parse_markdown
+from .errors import DocumentParseError, ResourceLimitError
+from .models import (
+    COLOR_SCHEMES,
+    PRESETS,
+    ColorScheme,
+    Document,
+    DocumentBlock,
+    FormatCapability,
+    ResourceLimits,
+    Template,
+)
+from .parser import parse_html, parse_markdown, parse_rst, parse_tex
+from .security import (
+    HiddenCharacterFinding,
+    inspect_document,
+    remove_suspicious_characters,
+    warn_if_suspicious,
+)
 
-_SUPPORTED_INPUTS = {".md", ".cv", ".txt", ".docx", ".pdf"}
-_SUPPORTED_OUTPUTS = {".md", ".cv", ".html", ".docx", ".pdf"}
+_FORMAT_CAPABILITIES: Mapping[str, FormatCapability] = MappingProxyType(
+    {
+        ".md": FormatCapability(".md", can_read=True, can_write=True),
+        ".cv": FormatCapability(".cv", can_read=True, can_write=True),
+        ".txt": FormatCapability(".txt", can_read=True, can_write=False),
+        ".html": FormatCapability(".html", can_read=True, can_write=True),
+        ".rst": FormatCapability(".rst", can_read=True, can_write=False),
+        ".tex": FormatCapability(".tex", can_read=True, can_write=False),
+        ".rtf": FormatCapability(".rtf", can_read=True, can_write=False, read_extra="rtf"),
+        ".odt": FormatCapability(".odt", can_read=True, can_write=False, read_extra="odt"),
+        ".docx": FormatCapability(
+            ".docx", can_read=True, can_write=True, read_extra="docx", write_extra="docx"
+        ),
+        ".pdf": FormatCapability(
+            ".pdf", can_read=True, can_write=True, read_extra="pdf", write_extra="pdf"
+        ),
+    }
+)
+SUPPORTED_INPUT_FORMATS = frozenset(
+    extension for extension, capability in _FORMAT_CAPABILITIES.items() if capability.can_read
+)
+SUPPORTED_OUTPUT_FORMATS = frozenset(
+    extension for extension, capability in _FORMAT_CAPABILITIES.items() if capability.can_write
+)
+_SUPPORTED_INPUTS = SUPPORTED_INPUT_FORMATS
+_SUPPORTED_OUTPUTS = SUPPORTED_OUTPUT_FORMATS
+
+
+def get_format_capabilities() -> Mapping[str, FormatCapability]:
+    """Return immutable capabilities keyed by normalized format extension."""
+    return _FORMAT_CAPABILITIES
 
 
 def _resolve_template(
-    preset: str | Template, color_scheme: str | ColorScheme | None
+    preset: str | Template,
+    color_scheme: str | ColorScheme | None,
+    font_family: str | None = None,
 ) -> tuple[Template, ColorScheme]:
     if isinstance(preset, Template):
         template = preset
@@ -26,6 +77,8 @@ def _resolve_template(
                 f"Unknown preset {preset!r}. Choose from: {', '.join(PRESETS)}"
             ) from error
 
+    if font_family is not None:
+        template = replace(template, font_family=font_family)
     if not template.font_family or not re.fullmatch(r"[A-Za-z0-9 ,'-]+", template.font_family):
         raise ValueError(
             "Font family must contain only letters, numbers, spaces, commas, apostrophes, or hyphens."
@@ -61,20 +114,93 @@ def _normalize_suffix(format_name: str) -> str:
     return suffix if suffix.startswith(".") else f".{suffix}"
 
 
-def _load_binary_document(source: Path | BinaryIO, suffix: str) -> Document:
+def _check_input_size(size: int, suffix: str, limits: ResourceLimits | None) -> None:
+    if limits and limits.max_input_bytes is not None and size > limits.max_input_bytes:
+        raise ResourceLimitError(
+            f"{suffix.upper()} input exceeds configured max_input_bytes "
+            f"({limits.max_input_bytes})."
+        )
+
+
+def _check_text_size(size: int, suffix: str, limits: ResourceLimits | None) -> None:
+    if limits and limits.max_text_chars is not None and size > limits.max_text_chars:
+        raise ResourceLimitError(
+            f"{suffix.upper()} input extracts more than the configured "
+            f"max_text_chars ({limits.max_text_chars})."
+        )
+
+
+def _check_document_text_size(
+    document: Document, suffix: str, limits: ResourceLimits | None
+) -> None:
+    _check_text_size(sum(len(block.text) for block in document.blocks), suffix, limits)
+
+
+def _decode_text_input(data: bytes, suffix: str) -> str:
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise DocumentParseError(
+            f"Could not decode {suffix.upper()} document as UTF-8 at byte offset {error.start}."
+        ) from error
+
+
+def _read_text_input(path: Path, suffix: str) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        raise DocumentParseError(
+            f"Could not decode {suffix.upper()} document as UTF-8 at byte offset {error.start}."
+        ) from error
+
+
+def _validate_pdf_envelope(source: Path | BinaryIO) -> None:
+    if isinstance(source, Path):
+        with source.open("rb") as stream:
+            header = stream.read(1024)
+            size = stream.seek(0, 2)
+            stream.seek(max(0, size - 1024))
+            trailer = stream.read()
+    else:
+        position = source.tell()
+        try:
+            header = source.read(1024)
+            source.seek(0, 2)
+            source.seek(max(0, source.tell() - 1024))
+            trailer = source.read()
+        finally:
+            source.seek(position)
+
+    if b"%PDF-" not in header:
+        raise DocumentParseError("Could not read PDF document: missing %PDF- header.")
+    if b"%%EOF" not in trailer:
+        raise DocumentParseError("Could not read PDF document: missing %%EOF marker.")
+
+
+def _load_binary_document(
+    source: Path | BinaryIO, suffix: str, limits: ResourceLimits | None = None
+) -> Document:
     if suffix == ".docx":
         try:
             from docx import Document as WordDocument
+            from docx.opc.exceptions import PackageNotFoundError
+            from lxml.etree import XMLSyntaxError
         except ImportError as error:
             raise ImportError(
                 "Reading DOCX requires python-docx. Install it with `pip install python-docx`."
             ) from error
 
-        word_document = WordDocument(source)
+        try:
+            word_document = WordDocument(source)
+        except (BadZipFile, PackageNotFoundError, XMLSyntaxError) as error:
+            raise DocumentParseError(f"Could not read DOCX document: {error}") from error
         blocks = []
+        text_size = 0
         for paragraph in word_document.paragraphs:
             if not paragraph.text.strip():
                 continue
+            text_size += len(paragraph.text)
+            _check_text_size(text_size, suffix, limits)
             style = paragraph.style.name.lower()
             if style.startswith("heading"):
                 match = re.search(r"\d+", style)
@@ -91,26 +217,122 @@ def _load_binary_document(source: Path | BinaryIO, suffix: str) -> Document:
             blocks.append(DocumentBlock(kind, paragraph.text))
         return Document(tuple(blocks))
 
+    if suffix == ".rtf":
+        try:
+            from striprtf.striprtf import rtf_to_text
+        except ImportError as error:
+            raise ImportError(
+                "Reading RTF requires striprtf. Install it with `pip install api-format-fix[rtf]`."
+            ) from error
+        raw = source.read_bytes() if isinstance(source, Path) else source.read()
+        return parse_markdown(rtf_to_text(raw.decode("ascii", errors="replace")))
+
+    if suffix == ".odt":
+        try:
+            from xml.parsers.expat import ExpatError
+
+            from odf.opendocument import load
+            from odf.teletype import extractText
+        except ImportError as error:
+            raise ImportError(
+                "Reading ODT requires odfpy. Install it with `pip install api-format-fix[odt]`."
+            ) from error
+        try:
+            odt_document = load(str(source)) if isinstance(source, Path) else load(source)
+        except (BadZipFile, ExpatError, KeyError) as error:
+            raise DocumentParseError(f"Could not read ODT document: {error}") from error
+        blocks = []
+
+        def append_text_blocks(element: object) -> None:
+            for child in getattr(element, "childNodes", ()):
+                tag = getattr(child, "qname", (None, None))[1]
+                if tag in {"h", "p"}:
+                    text = extractText(child).strip()
+                    if text:
+                        if tag == "h":
+                            level = int(child.getAttribute("outlinelevel") or "1")
+                            kind = f"heading{min(level, 6)}"
+                        else:
+                            kind = "paragraph"
+                        blocks.append(DocumentBlock(kind, text))
+                else:
+                    append_text_blocks(child)
+
+        append_text_blocks(odt_document.text)
+        return Document(tuple(blocks))
+
     try:
         from pypdf import PdfReader
+        from pypdf.errors import PdfReadError
     except ImportError as error:
         raise ImportError(
             "Reading PDF requires pypdf. Install it with `pip install pypdf`."
         ) from error
 
-    reader = PdfReader(source)
-    text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
+    try:
+        _validate_pdf_envelope(source)
+        reader = PdfReader(source)
+        if reader.is_encrypted:
+            raise DocumentParseError(
+                "Could not read PDF document: encrypted PDFs are not supported."
+            )
+        pages = reader.pages
+        if limits and limits.max_pdf_pages is not None and len(pages) > limits.max_pdf_pages:
+            raise ResourceLimitError(
+                f"PDF contains {len(pages)} pages; configured max_pdf_pages is "
+                f"{limits.max_pdf_pages}."
+            )
+        page_text = []
+        text_size = 0
+        for page in pages:
+            extracted = page.extract_text() or ""
+            text_size += len(extracted)
+            _check_text_size(text_size, suffix, limits)
+            page_text.append(extracted)
+        text = "\n\n".join(page_text)
+    except DocumentParseError:
+        raise
+    except ResourceLimitError:
+        raise
+    except PdfReadError as error:
+        raise DocumentParseError(f"Could not read PDF document: {error}") from error
     return parse_markdown(text)
 
 
-def _load_document(path: Path) -> Document:
+def _load_document(path: Path, limits: ResourceLimits | None = None) -> Document:
     suffix = path.suffix.lower()
     if suffix not in _SUPPORTED_INPUTS:
         raise ValueError(f"Unsupported input format {suffix or '(no extension)'!r}.")
 
-    if suffix in {".md", ".cv", ".txt"}:
-        return parse_markdown(path.read_text(encoding="utf-8"))
-    return _load_binary_document(path, suffix)
+    try:
+        if limits and limits.max_input_bytes is not None:
+            with path.open("rb") as source:
+                data = source.read(limits.max_input_bytes + 1)
+            _check_input_size(len(data), suffix, limits)
+            if suffix in {".md", ".cv", ".txt", ".html", ".rst", ".tex"}:
+                document = _parse_text_input(_decode_text_input(data, suffix), suffix)
+            else:
+                document = _load_binary_document(BytesIO(data), suffix, limits)
+        elif suffix in {".md", ".cv", ".txt", ".html", ".rst", ".tex"}:
+            document = _parse_text_input(_read_text_input(path, suffix), suffix)
+        else:
+            document = _load_binary_document(path, suffix, limits)
+    except DocumentParseError as error:
+        raise DocumentParseError(f"{error} (input: {path})") from error
+    except ResourceLimitError as error:
+        raise ResourceLimitError(f"{error} (input: {path})") from error
+    try:
+        _check_document_text_size(document, suffix, limits)
+    except ResourceLimitError as error:
+        raise ResourceLimitError(f"{error} (input: {path})") from error
+    return document
+
+
+def inspect_file(
+    path: str | Path, resource_limits: ResourceLimits | None = None
+) -> tuple[HiddenCharacterFinding, ...]:
+    """Scan extracted document text for suspicious invisible/control characters."""
+    return inspect_document(_load_document(Path(path), resource_limits))
 
 
 def _inline_html(text: str) -> str:
@@ -299,6 +521,7 @@ def render_document(
     output_format: str,
     preset: str | Template = "formal",
     color_scheme: str | ColorScheme | None = None,
+    font_family: str | None = None,
 ) -> str | None:
     """Render a document as text/HTML, or return None for file-based formats."""
     suffix = _normalize_suffix(output_format) or "."
@@ -307,7 +530,7 @@ def render_document(
             f"Unsupported output format {suffix!r}. Choose from: {', '.join(sorted(_SUPPORTED_OUTPUTS))}"
         )
 
-    template, colors = _resolve_template(preset, color_scheme)
+    template, colors = _resolve_template(preset, color_scheme, font_family)
     if suffix in {".md", ".cv"}:
         return _render_markdown(document)
     if suffix == ".html":
@@ -321,6 +544,9 @@ def format_content(
     output_format: str,
     preset: str | Template = "formal",
     color_scheme: str | ColorScheme | None = None,
+    font_family: str | None = None,
+    remove_hidden_characters: bool = False,
+    resource_limits: ResourceLimits | None = None,
 ) -> str | bytes:
     """Format in-memory content; text outputs are strings and DOCX/PDF outputs are bytes."""
     input_suffix = _normalize_suffix(input_format)
@@ -333,19 +559,25 @@ def format_content(
             f"Choose from: {', '.join(sorted(_SUPPORTED_OUTPUTS))}"
         )
 
-    if isinstance(input_data, str):
-        if input_suffix not in {".md", ".cv", ".txt"}:
-            raise TypeError(f"Input for {input_suffix} must be bytes.")
-        document = parse_markdown(input_data)
-    elif isinstance(input_data, bytes):
-        if input_suffix in {".md", ".cv", ".txt"}:
-            document = parse_markdown(input_data.decode("utf-8"))
-        else:
-            document = _load_binary_document(BytesIO(input_data), input_suffix)
-    else:
+    if not isinstance(input_data, (str, bytes)):
         raise TypeError("input_data must be str or bytes.")
-
-    template, colors = _resolve_template(preset, color_scheme)
+    input_size = len(input_data.encode("utf-8")) if isinstance(input_data, str) else len(input_data)
+    _check_input_size(input_size, input_suffix, resource_limits)
+    text_formats = {".md", ".cv", ".txt", ".rst", ".tex", ".html"}
+    if isinstance(input_data, str):
+        if input_suffix not in text_formats:
+            raise TypeError(f"Input for {input_suffix} must be bytes.")
+        document = _parse_text_input(input_data, input_suffix)
+    elif isinstance(input_data, bytes):
+        if input_suffix in text_formats:
+            document = _parse_text_input(_decode_text_input(input_data, input_suffix), input_suffix)
+        else:
+            document = _load_binary_document(BytesIO(input_data), input_suffix, resource_limits)
+    _check_document_text_size(document, input_suffix, resource_limits)
+    warn_if_suspicious(document)
+    if remove_hidden_characters:
+        document = remove_suspicious_characters(document)
+    template, colors = _resolve_template(preset, color_scheme, font_family)
     if output_suffix in {".md", ".cv"}:
         return _render_markdown(document)
     if output_suffix == ".html":
@@ -364,6 +596,9 @@ def format_file(
     output_path: str | Path,
     preset: str | Template = "formal",
     color_scheme: str | ColorScheme | None = None,
+    font_family: str | None = None,
+    remove_hidden_characters: bool = False,
+    resource_limits: ResourceLimits | None = None,
 ) -> Path:
     """Format a file at the requested paths; constrain untrusted paths in the caller."""
     source = Path(input_path)
@@ -372,8 +607,11 @@ def format_file(
     if suffix not in _SUPPORTED_OUTPUTS:
         raise ValueError(f"Unsupported output format {suffix or '(no extension)'!r}.")
 
-    document = _load_document(source)
-    template, colors = _resolve_template(preset, color_scheme)
+    document = _load_document(source, resource_limits)
+    warn_if_suspicious(document)
+    if remove_hidden_characters:
+        document = remove_suspicious_characters(document)
+    template, colors = _resolve_template(preset, color_scheme, font_family)
     if suffix in {".md", ".cv", ".html"}:
         rendered = render_document(document, suffix, template, colors)
         destination.write_text(rendered or "", encoding="utf-8")
@@ -382,3 +620,13 @@ def format_file(
     else:
         _render_pdf(document, template, colors, destination)
     return destination
+
+
+def _parse_text_input(text: str, suffix: str) -> Document:
+    if suffix == ".html":
+        return parse_html(text)
+    if suffix == ".rst":
+        return parse_rst(text)
+    if suffix == ".tex":
+        return parse_tex(text)
+    return parse_markdown(text)
