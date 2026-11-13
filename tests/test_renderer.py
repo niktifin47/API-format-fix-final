@@ -117,6 +117,27 @@ def test_rtf_and_odt_inputs_extract_text(tmp_path: Path):
     assert rendered == "# ODT title\n\nODT text\n"
 
 
+@pytest.mark.parametrize(
+    ("header", "encoding", "text"),
+    [
+        (b"\\ansi\\ansicpg1252 ", "cp1252", "café"),
+        (b"\\ansi\\ansicpg1251 ", "cp1251", "Привет"),
+        (b"\\ansi ", "cp1252", "café"),
+    ],
+)
+def test_rtf_input_decodes_ansi_codepage(header: bytes, encoding: str, text: str):
+    source = b"{\\rtf1" + header + text.encode(encoding) + b"}"
+
+    assert format_content(source, ".rtf", ".md") == f"{text}\n"
+
+
+def test_rtf_input_reports_unsupported_ansi_codepage():
+    source = b"{\\rtf1\\ansi\\ansicpg999999 text}"
+
+    with pytest.raises(DocumentParseError, match="Could not decode RTF document"):
+        format_content(source, ".rtf", ".md")
+
+
 def test_hidden_unicode_is_reported_and_only_removed_when_requested(tmp_path: Path):
     source = tmp_path / "input.md"
     destination = tmp_path / "output.md"
