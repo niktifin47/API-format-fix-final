@@ -111,7 +111,7 @@ assert pdf.read_extra == pdf.write_extra == "pdf"
 
 ## Kotlin and Android
 
-The `android` Gradle module provides a native Kotlin API for Android (minimum SDK 23) with the same supported input and output formats. Add the module to an Android project and call:
+The `android` Gradle module provides a native Kotlin API for Android (minimum SDK 23). Android currently supports `.md`, `.cv`, `.txt`, `.docx`, and `.pdf` inputs, and `.md`, `.cv`, `.html`, `.docx`, and `.pdf` outputs. Unlike the Python package, Android does not support HTML, reStructuredText, TeX, RTF, or ODT input. Add the module to an Android project and call:
 
 ```kotlin
 val html = ApiFormatFix.formatText("# Resume", ".md", ".html")
@@ -123,14 +123,34 @@ val pdf = ApiFormatFix.formatContent(
 )
 ```
 
-Text input/output uses `formatText`; `formatContent` handles byte input and output, including DOCX and PDF. PDF support uses PDFBox Android. Include the `android` directory as an Android library Gradle subproject; no Maven publication is configured. Python and Kotlin implementations are maintained as separate libraries.
+Text input/output uses `formatText`; `formatContent` handles byte input and output, including DOCX and PDF. PDF support uses PDFBox Android. Configure `ResourceLimits` when processing untrusted files:
+
+```kotlin
+val limits = ResourceLimits(
+    maxInputBytes = 20_000_000,
+    maxPdfPages = 200,
+    maxTextChars = 2_000_000,
+    maxDecompressedBytes = 40_000_000,
+)
+val findings = ApiFormatFix.inspectContent(context, documentBytes, ".docx", limits)
+val markdown = ApiFormatFix.formatContent(
+    context,
+    documentBytes,
+    ".docx",
+    ".md",
+    resourceLimits = limits,
+    removeHiddenCharacters = true,
+)
+```
+
+All limits default to `null` (unlimited). `maxDecompressedBytes` bounds the DOCX `word/document.xml` entry; it does not cap total ZIP expansion. PDF page and text limits are checked during extraction, but PDFBox must load the PDF first, so they do not bound parser memory or CPU. Inspect findings are returned without changing content; cleanup is opt-in and preserves emoji joiners. Limits are not a parser sandbox: callers should constrain input paths and isolate processing of hostile files. Include the `android` directory as an Android library Gradle subproject; no Maven publication is configured. Python and Kotlin implementations are maintained as separate libraries.
 
 ## Platform and distribution support
 
 | Platform or ecosystem | Available support |
 | --- | --- |
-| Windows x64 | Python package, plus a self-contained CLI EXE distributed inside a ZIP. The EXE is not an installer; no MSI or x86 release is provided. |
-| Linux | Python package. CI covers Ubuntu 22.04/24.04, Debian, and Fedora containers; Arch-specific jobs, distro installers, and desktop-environment integrations are not provided. |
+| Windows x64 | Python package, plus a self-contained CLI EXE distributed inside a ZIP. Keep the ZIP as the only native artifact for now; MSI installation/update lifecycle and x86 dependency packaging are not justified by current demand. |
+| Linux | Python package. CI checks Ubuntu 22.04/24.04, Debian, Fedora, and Arch Linux containers; distro installers and desktop-environment integrations are not provided. |
 | macOS | Python package, covered by the CI OS matrix. No native macOS installer is provided. |
 | npm / Node.js | No npm package or JavaScript API is provided. |
 | iOS | No iOS runtime or native package is provided. |
@@ -161,7 +181,7 @@ python -m ruff check .
 python -m build
 ```
 
-Pull requests run the Python checks in GitHub Actions on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Linux container checks for Ubuntu 22.04/24.04, Debian, and Fedora. This validates the CLI/library in those operating-system environments; it does not emulate GUI desktop workspaces or iOS. A separate Linux job tests, builds, and lints the Android module. When CI fails, a diagnostic job reruns Python checks with verbose output on Ubuntu/Python 3.12 and summarizes each result; compare it with the original matrix job for platform-only failures. CodeQL runs as a separate security analysis and must be reviewed independently—test/build failures are not themselves a security assessment. Run the same Android checks locally with `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS. Pushing a `v*` tag builds source and wheel distributions and attaches them to a GitHub Release. Publishing to PyPI is not configured by default.
+Pull requests run the Python checks in GitHub Actions on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Linux container checks for Ubuntu 22.04/24.04, Debian, Fedora, and Arch Linux. This validates the CLI/library in those operating-system environments; it does not emulate GUI desktop workspaces or iOS. A separate Linux job tests, builds, and lints the Android module. When CI fails, a diagnostic job reruns Python checks with verbose output on Ubuntu/Python 3.12 and summarizes each result; compare it with the original matrix job for platform-only failures. CodeQL runs as a separate security analysis and must be reviewed independently—test/build failures are not themselves a security assessment. Run the same Android checks locally with `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS. Pushing a `v*` tag builds source and wheel distributions and attaches them to a GitHub Release. Publishing to PyPI is not configured by default.
 
 The same release workflow also builds a self-contained Windows CLI ZIP, generates Winget manifests with its release URL and SHA-256 checksum of that release asset, and attaches a `SHA256SUMS.txt` file for the release artifacts. Submit those manifests to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to make `winget install niktifin47.APIFormatFix` available after Microsoft accepts the package. No Winget submission or npm publication is made by this repository workflow; both require maintainer-controlled registry accounts and review. A published checksum is only available after a maintainer creates and tests a tagged release.
 
