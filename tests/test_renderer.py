@@ -137,6 +137,12 @@ def test_rtf_input_falls_back_for_unknown_ansi_codepage():
     assert format_content(source, ".rtf", ".md") == "text\n"
 
 
+def test_rtf_input_respects_max_input_bytes():
+    source = b"{\\rtf1\\ansi text}"
+    with pytest.raises(ResourceLimitError, match="max_input_bytes"):
+        format_content(source, ".rtf", ".md", resource_limits=ResourceLimits(max_input_bytes=4))
+
+
 def test_rtf_input_decodes_hex_escapes_in_group_using_declared_codepage():
     text = "\u041f\u0440\u0438\u0432\u0435\u0442"
     hex_bytes = b"".join(
