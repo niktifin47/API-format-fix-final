@@ -94,7 +94,7 @@ Supported inputs: `.md`, `.cv`, `.txt`, `.html`, `.rst`, `.tex`, `.rtf`, `.odt`,
 
 Supported outputs: `.md`, `.cv`, `.html`, `.docx`, and `.pdf`.
 
-HTML, reStructuredText, and TeX readers extract common visible text and headings; they do not preserve layout or every markup construct. RTF and ODT readers preserve extracted text only. DOCX and PDF input/output also extract/rebuild text and do not preserve original page layout, images, tables, embedded content, or advanced formatting. DOCX uses `python-docx`; PDF input uses `pypdf`; PDF output uses ReportLab; RTF uses `striprtf`; ODT uses `odfpy`. Optional imports remain lazy, and a missing dependency names the extra to install.
+HTML, reStructuredText, and TeX readers extract common visible text and headings; they do not preserve layout or every markup construct. RTF and ODT readers preserve extracted text only. RTF decoding honors declared ANSI code pages with tolerant fallback for malformed/unknown legacy encodings. DOCX and PDF input/output also extract/rebuild text and do not preserve original page layout, images, tables, embedded content, or advanced formatting. DOCX uses `python-docx`; PDF input uses `pypdf`; PDF output uses ReportLab; RTF uses `striprtf`; ODT uses `odfpy`. Optional imports remain lazy, and a missing dependency names the extra to install.
 
 PDF input is text extraction only. A scanned PDF without a text layer produces empty text; OCR is not included.
 

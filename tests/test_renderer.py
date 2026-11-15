@@ -131,11 +131,10 @@ def test_rtf_input_decodes_ansi_codepage(header: bytes, encoding: str, text: str
     assert format_content(source, ".rtf", ".md") == f"{text}\n"
 
 
-def test_rtf_input_reports_unsupported_ansi_codepage():
+def test_rtf_input_falls_back_for_unknown_ansi_codepage():
     source = b"{\\rtf1\\ansi\\ansicpg999999 text}"
 
-    with pytest.raises(DocumentParseError, match="Could not decode RTF document"):
-        format_content(source, ".rtf", ".md")
+    assert format_content(source, ".rtf", ".md") == "text\n"
 
 
 def test_rtf_input_decodes_hex_escapes_in_group_using_declared_codepage():

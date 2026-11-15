@@ -228,10 +228,19 @@ def _load_binary_document(
         codepage = re.search(rb"\\ansicpg(\d+)", raw)
         encoding = f"cp{codepage.group(1).decode('ascii')}" if codepage else "cp1252"
         try:
-            rtf_text = raw.decode(encoding)
-        except (LookupError, UnicodeDecodeError) as error:
-            raise DocumentParseError(f"Could not decode RTF document using {encoding}.") from error
-        return parse_markdown(rtf_to_text(rtf_text, encoding=encoding))
+            rtf_text = raw.decode(encoding, errors="replace")
+        except LookupError:
+            rtf_text = raw.decode("cp1252", errors="replace")
+            encoding = "cp1252"
+        try:
+            text = rtf_to_text(rtf_text, encoding=encoding, errors="replace")
+        except TypeError:
+            text = rtf_to_text(rtf_text, encoding=encoding)
+        except Exception as error:
+            raise DocumentParseError(f"Could not read RTF document: {error}") from error
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        text = re.sub(r"[ \t]+\n", "\n", text)
+        return parse_markdown(text)
 
     if suffix == ".odt":
         try:
@@ -315,12 +324,15 @@ def _load_document(path: Path, limits: ResourceLimits | None = None) -> Document
             with path.open("rb") as source:
                 data = source.read(limits.max_input_bytes + 1)
             _check_input_size(len(data), suffix, limits)
-            if suffix in {".md", ".cv", ".txt", ".html", ".rst", ".tex"}:
-                document = _parse_text_input(_decode_text_input(data, suffix), suffix)
+            if suffix in _TEXT_FORMATS or suffix == ".rtf":
+                document = _load_text_document_from_bytes(data, suffix)
             else:
                 document = _load_binary_document(BytesIO(data), suffix, limits)
-        elif suffix in {".md", ".cv", ".txt", ".html", ".rst", ".tex"}:
+        elif suffix in _TEXT_FORMATS:
             document = _parse_text_input(_read_text_input(path, suffix), suffix)
+        elif suffix == ".rtf":
+            with path.open("rb") as source:
+                document = _load_binary_document(source, suffix, limits)
         else:
             document = _load_binary_document(path, suffix, limits)
     except DocumentParseError as error:
@@ -569,14 +581,13 @@ def format_content(
         raise TypeError("input_data must be str or bytes.")
     input_size = len(input_data.encode("utf-8")) if isinstance(input_data, str) else len(input_data)
     _check_input_size(input_size, input_suffix, resource_limits)
-    text_formats = {".md", ".cv", ".txt", ".rst", ".tex", ".html"}
     if isinstance(input_data, str):
-        if input_suffix not in text_formats:
+        if input_suffix not in _TEXT_FORMATS:
             raise TypeError(f"Input for {input_suffix} must be bytes.")
         document = _parse_text_input(input_data, input_suffix)
     elif isinstance(input_data, bytes):
-        if input_suffix in text_formats:
-            document = _parse_text_input(_decode_text_input(input_data, input_suffix), input_suffix)
+        if input_suffix in _TEXT_FORMATS or input_suffix == ".rtf":
+            document = _load_text_document_from_bytes(input_data, input_suffix)
         else:
             document = _load_binary_document(BytesIO(input_data), input_suffix, resource_limits)
     _check_document_text_size(document, input_suffix, resource_limits)
@@ -628,6 +639,9 @@ def format_file(
     return destination
 
 
+_TEXT_FORMATS = {".md", ".cv", ".txt", ".html", ".rst", ".tex"}
+
+
 def _parse_text_input(text: str, suffix: str) -> Document:
     if suffix == ".html":
         return parse_html(text)
@@ -636,3 +650,9 @@ def _parse_text_input(text: str, suffix: str) -> Document:
     if suffix == ".tex":
         return parse_tex(text)
     return parse_markdown(text)
+
+
+def _load_text_document_from_bytes(data: bytes, suffix: str) -> Document:
+    if suffix == ".rtf":
+        return _load_binary_document(BytesIO(data), suffix)
+    return _parse_text_input(_decode_text_input(data, suffix), suffix)
