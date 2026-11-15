@@ -1,8 +1,40 @@
+import json
 import sys
 
 import pytest
 
 from api_format_fix import cli
+
+
+def test_cli_prints_package_version(monkeypatch: pytest.MonkeyPatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["api-format-fix", "--version"])
+
+    with pytest.raises(SystemExit) as error:
+        cli.main()
+
+    assert error.value.code == 0
+    assert capsys.readouterr().out == f"api-format-fix {cli.__version__}\n"
+
+
+def test_cli_diagnostics_are_json_and_describe_formats_and_dependencies(
+    monkeypatch: pytest.MonkeyPatch, capsys
+):
+    monkeypatch.setattr(sys, "argv", ["api-format-fix", "--diagnostics"])
+
+    cli.main()
+
+    diagnostics = json.loads(capsys.readouterr().out)
+    assert diagnostics["version"] == cli.__version__
+    assert diagnostics["python"]
+    assert diagnostics["platform"]
+    assert diagnostics["formats"][".rtf"] == {"read": True, "write": False}
+    assert diagnostics["formats"][".pdf"] == {"read": True, "write": True}
+    assert set(diagnostics["optional_dependencies"]) == {"docx", "odt", "pdf", "rtf"}
+    assert all(
+        isinstance(available, bool)
+        for modules in diagnostics["optional_dependencies"].values()
+        for available in modules.values()
+    )
 
 
 def test_cli_reports_format_errors_concisely(monkeypatch: pytest.MonkeyPatch, capsys):

@@ -21,6 +21,28 @@ import java.util.zip.ZipOutputStream
 @Config(sdk = [35])
 class ApiFormatFixTest {
     @Test
+    fun formatCapabilitiesDescribeAndroidInputAndOutputFormats() {
+        val capabilities = ApiFormatFix.getFormatCapabilities()
+
+        assertEquals(
+            setOf(".md", ".cv", ".txt", ".docx", ".pdf"),
+            capabilities.filterValues { it.canRead }.keys,
+        )
+        assertEquals(
+            setOf(".md", ".cv", ".html", ".docx", ".pdf"),
+            capabilities.filterValues { it.canWrite }.keys,
+        )
+        assertEquals(
+            FormatCapability(".html", canRead = false, canWrite = true),
+            capabilities[".html"],
+        )
+        assertThrows(UnsupportedOperationException::class.java) {
+            (capabilities as MutableMap)[".custom"] =
+                FormatCapability(".custom", canRead = true, canWrite = true)
+        }
+    }
+
+    @Test
     fun textFormattingEscapesInputAndAppliesPreset() {
         val html = ApiFormatFix.formatText(
             "# <script>alert(1)</script>\n\n**Safe**",

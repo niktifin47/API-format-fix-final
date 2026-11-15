@@ -17,6 +17,7 @@ import java.io.IOException
 import java.io.Writer
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
+import java.util.Collections
 import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -60,6 +61,12 @@ data class HiddenCharacterFinding(
     val name: String,
 )
 
+data class FormatCapability(
+    val extension: String,
+    val canRead: Boolean,
+    val canWrite: Boolean,
+)
+
 data class FormatTemplate(
     val name: String,
     val fontFamily: String,
@@ -90,6 +97,18 @@ object ApiFormatFix {
     private val colorPattern = Regex("#[0-9a-fA-F]{6}")
     private const val WORD_NAMESPACE =
         "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    private val formatCapabilities: Map<String, FormatCapability> =
+        Collections.unmodifiableMap(
+            (supportedInputs + supportedOutputs)
+                .sorted()
+                .associateWith { extension ->
+                    FormatCapability(
+                        extension = extension,
+                        canRead = extension in supportedInputs,
+                        canWrite = extension in supportedOutputs,
+                    )
+                },
+        )
 
     val templates = mapOf(
         "formal" to FormatTemplate("formal", "Times New Roman", 11f, 16f, "navy"),
@@ -100,6 +119,9 @@ object ApiFormatFix {
         "navy" to FormatColorScheme("navy", "#202124", "#17365d", "#345f8c"),
         "teal" to FormatColorScheme("teal", "#263238", "#00695c", "#ef6c57"),
     )
+
+    @JvmStatic
+    fun getFormatCapabilities(): Map<String, FormatCapability> = formatCapabilities
 
     @JvmStatic
     fun formatText(

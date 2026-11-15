@@ -66,6 +66,8 @@ api-format-fix resume.md resume.docx --preset friendly
 api-format-fix resume.pdf resume.html --color-scheme teal
 api-format-fix resume.pdf resume.html --max-input-bytes 20000000 --max-pdf-pages 100 --max-text-chars 2000000
 api-format-fix resume.pdf resume.html --debug
+api-format-fix --version
+api-format-fix --diagnostics
 api-format-fix --list-presets
 ```
 
@@ -84,6 +86,9 @@ markdown = format_content(pdf_document, ".pdf", ".md")
 
 The CLI's `--debug` option prints a traceback for formatting errors; without it,
 errors remain concise and include installation guidance for missing format extras.
+`--version` prints the installed package version. `--diagnostics` prints JSON with
+the Python/platform versions, supported input/output formats, and availability of
+optional document-format dependencies; it does not import those dependencies.
 
 Supported inputs: `.md`, `.cv`, `.txt`, `.html`, `.rst`, `.tex`, `.rtf`, `.odt`, `.docx`, and `.pdf`.
 
@@ -123,7 +128,19 @@ val pdf = ApiFormatFix.formatContent(
 )
 ```
 
-Text input/output uses `formatText`; `formatContent` handles byte input and output, including DOCX and PDF. PDF support uses PDFBox Android. Configure `ResourceLimits` when processing untrusted files:
+Text input/output uses `formatText`; `formatContent` handles byte input and output, including DOCX and PDF. PDF support uses PDFBox Android.
+
+`ApiFormatFix.getFormatCapabilities()` returns an immutable map keyed by file
+extension. Each `FormatCapability` reports whether Android can read and write
+that format, so applications can discover platform support without maintaining
+their own extension lists:
+
+```kotlin
+val pdf = ApiFormatFix.getFormatCapabilities().getValue(".pdf")
+check(pdf.canRead && pdf.canWrite)
+```
+
+Configure `ResourceLimits` when processing untrusted files:
 
 ```kotlin
 val limits = ResourceLimits(
