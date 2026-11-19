@@ -1,10 +1,46 @@
 import argparse
+import importlib.util
+import json
+import platform
 import sys
 import traceback
 from pathlib import Path
 
+from . import __version__
 from .models import COLOR_SCHEMES, FONT_FAMILIES, PRESETS, ResourceLimits
-from .renderer import SUPPORTED_OUTPUT_FORMATS, format_file, inspect_file
+from .renderer import (
+    SUPPORTED_OUTPUT_FORMATS,
+    format_file,
+    get_format_capabilities,
+    inspect_file,
+)
+
+_OPTIONAL_MODULES = {
+    "docx": ("docx",),
+    "odt": ("odf",),
+    "pdf": ("pypdf", "reportlab"),
+    "rtf": ("striprtf",),
+}
+
+
+def _diagnostics() -> dict[str, object]:
+    capabilities = get_format_capabilities()
+    return {
+        "version": __version__,
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "formats": {
+            extension: {"read": capability.can_read, "write": capability.can_write}
+            for extension, capability in sorted(capabilities.items())
+        },
+        "optional_dependencies": {
+            extra: {
+                module: importlib.util.find_spec(module) is not None
+                for module in modules
+            }
+            for extra, modules in sorted(_OPTIONAL_MODULES.items())
+        },
+    }
 
 
 def _positive_integer(value: str) -> int:
@@ -24,6 +60,14 @@ def main() -> None:
     )
     parser.add_argument("input", nargs="?", help="Input document path")
     parser.add_argument("output", nargs="?", help="Output document path")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
+    parser.add_argument(
+        "--diagnostics",
+        action="store_true",
+        help="Print runtime, format, and optional-dependency information as JSON",
+    )
     parser.add_argument("--preset", choices=sorted(PRESETS), default="formal")
     parser.add_argument("--color-scheme", choices=sorted(COLOR_SCHEMES))
     parser.add_argument("--font-family", choices=FONT_FAMILIES)
@@ -53,6 +97,9 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true", help="Show a traceback if formatting fails")
     args = parser.parse_args()
 
+    if args.diagnostics:
+        print(json.dumps(_diagnostics(), indent=2, sort_keys=True))
+        return
     if args.list_presets:
         for name, template in PRESETS.items():
             print(

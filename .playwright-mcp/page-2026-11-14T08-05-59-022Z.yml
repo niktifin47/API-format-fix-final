@@ -1,0 +1,202 @@
+- generic [ref=f18e2]:
+  - menu "New ruleset" [ref=f18e284]:
+    - menuitem "New branch ruleset" [active] [ref=f18e285] [cursor=pointer]
+    - menuitem "New tag ruleset" [ref=f18e288] [cursor=pointer]
+    - listitem [aria-hidden] [ref=f18e291]
+    - menuitem "Import a ruleset" [ref=f18e292]:
+      - generic [ref=f18e295]:
+        - generic [ref=f18e296]: Import a ruleset
+        - generic [ref=f18e297]: Choose a JSON file to upload
+  - generic [ref=f18e3]:
+    - link "Skip to content" [ref=f18e4] [cursor=pointer]:
+      - /url: "#start-of-content"
+    - banner "Global navigation menu" [ref=f18e8]:
+      - generic [ref=f18e9]:
+        - generic [ref=f18e10]:
+          - button "Open menu" [ref=f18e12] [cursor=pointer]
+          - link "Homepage (g then d)" [ref=f18e15] [cursor=pointer]:
+            - /url: /
+        - generic [ref=f18e18]:
+          - navigation "Breadcrumbs" [ref=f18e19]:
+            - list [ref=f18e20]:
+              - listitem [ref=f18e21]:
+                - link "niktifin47" [ref=f18e22] [cursor=pointer]:
+                  - /url: /niktifin47
+              - listitem [ref=f18e24]:
+                - link "API-format-fix-final" [ref=f18e25] [cursor=pointer]:
+                  - /url: /niktifin47/API-format-fix-final
+                - button "Switch repository (alt shift r)" [ref=f18e26] [cursor=pointer]
+          - button "Open quick search dialog, type / to search" [ref=f18e31] [cursor=pointer]:
+            - generic [ref=f18e33]:
+              - generic:
+                - text: Type
+                - generic: /
+                - text: to search
+        - generic [ref=f18e34]:
+          - generic [ref=f18e35]:
+            - generic [ref=f18e38]:
+              - link "Chat with Copilot" [ref=f18e40] [cursor=pointer]:
+                - /url: /copilot
+              - button "Open Copilot…" [ref=f18e45] [cursor=pointer]
+            - button "Create new..." [ref=f18e47] [cursor=pointer]
+            - generic [ref=f18e49]:
+              - link "All issues" [ref=f18e50] [cursor=pointer]:
+                - /url: /issues
+              - link "All pull requests" [ref=f18e54] [cursor=pointer]:
+                - /url: /pulls
+              - link "All repositories" [ref=f18e57] [cursor=pointer]:
+                - /url: /repos
+          - link "You have unread notifications (g then n)" [ref=f18e281] [cursor=pointer]:
+            - /url: /notifications
+          - button "Open user navigation menu" [ref=f18e64] [cursor=pointer]:
+            - img "Nikolas" [ref=f18e65]
+      - heading "Repository navigation" [level=2] [ref=f18e66]
+      - navigation "Repository" [ref=f18e67]:
+        - list [ref=f18e68]:
+          - listitem [ref=f18e69]:
+            - link "Code" [ref=f18e70] [cursor=pointer]:
+              - /url: /niktifin47/API-format-fix-final
+          - listitem [ref=f18e75]:
+            - link "Issues" [ref=f18e76] [cursor=pointer]:
+              - /url: /niktifin47/API-format-fix-final/issues
+          - listitem [ref=f18e82]:
+            - link "Pull requests" [ref=f18e83] [cursor=pointer]:
+              - /url: /niktifin47/API-format-fix-final/pulls
+          - listitem [ref=f18e88]:
+            - link "Agents" [ref=f18e89] [cursor=pointer]:
+              - /url: /niktifin47/API-format-fix-final/agents?author=niktifin47
+          - listitem [ref=f18e95]:
+            - link "Actions" [ref=f18e96] [cursor=pointer]:
+              - /url: /niktifin47/API-format-fix-final/actions
+          - listitem [ref=f18e101]:
+            - link "Projects" [ref=f18e102] [cursor=pointer]:
+              - /url: /niktifin47/API-format-fix-final/projects
+          - listitem [ref=f18e107]:
+            - link "Wiki" [ref=f18e108] [cursor=pointer]:
+              - /url: /niktifin47/API-format-fix-final/wiki
+          - listitem [ref=f18e113]:
+            - link "Security and quality" [ref=f18e114] [cursor=pointer]:
+              - /url: /niktifin47/API-format-fix-final/security
+        - button "More items, including current item" [ref=f18e121] [cursor=pointer]:
+          - generic [ref=f18e124]:
+            - text: More
+            - generic [ref=f18e125]: items
+  - main [ref=f18e129]:
+    - generic [ref=f18e131]:
+      - 'heading "Settings: niktifin47/API-format-fix-final" [level=1] [ref=f18e132]'
+      - generic [ref=f18e134]:
+        - navigation "General settings" [ref=f18e137]:
+          - list [ref=f18e139]:
+            - listitem [ref=f18e140]:
+              - link "General" [ref=f18e141] [cursor=pointer]:
+                - /url: /niktifin47/API-format-fix-final/settings
+            - listitem [aria-hidden] [ref=f18e143]
+            - listitem [ref=f18e144]:
+              - generic [ref=f18e147]:
+                - heading "Access" [level=2] [ref=f18e149]
+                - list "Access" [ref=f18e150]:
+                  - listitem [ref=f18e151]:
+                    - link "Collaborators" [ref=f18e152] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/access
+                  - listitem [ref=f18e154]:
+                    - button "Moderation" [ref=f18e155] [cursor=pointer]
+            - listitem [aria-hidden] [ref=f18e157]
+            - listitem [ref=f18e158]:
+              - generic [ref=f18e161]:
+                - heading "Code, planning, and automation" [level=2] [ref=f18e163]
+                - list "Code, planning, and automation" [ref=f18e164]:
+                  - listitem [ref=f18e165]:
+                    - button "Rulesets" [expanded] [ref=f18e166] [cursor=pointer]
+                    - list "Rulesets" [ref=f18e168]:
+                      - listitem [ref=f18e169]:
+                        - link "Rulesets" [ref=f18e170] [cursor=pointer]:
+                          - /url: /niktifin47/API-format-fix-final/settings/rules
+                  - listitem [ref=f18e172]:
+                    - link "Branches" [ref=f18e173] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/branches
+                  - listitem [ref=f18e175]:
+                    - link "Tags" [ref=f18e176] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/tag_protection
+                  - listitem [ref=f18e178]:
+                    - button "Actions" [ref=f18e179] [cursor=pointer]
+                  - listitem [ref=f18e181]:
+                    - link "Webhooks" [ref=f18e182] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/hooks
+                  - listitem [ref=f18e184]:
+                    - button "Copilot" [ref=f18e185] [cursor=pointer]
+                  - listitem [ref=f18e187]:
+                    - button "Planning" [ref=f18e188] [cursor=pointer]
+                  - listitem [ref=f18e190]:
+                    - link "Environments" [ref=f18e191] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/environments
+                  - listitem [ref=f18e193]:
+                    - link "Codespaces" [ref=f18e194] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/codespaces
+                  - listitem [ref=f18e196]:
+                    - link "Pages" [ref=f18e197] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/pages
+            - listitem [aria-hidden] [ref=f18e199]
+            - listitem [ref=f18e200]:
+              - generic [ref=f18e203]:
+                - heading "Security and quality" [level=2] [ref=f18e205]
+                - list "Security and quality" [ref=f18e206]:
+                  - listitem [ref=f18e207]:
+                    - link "Advanced Security" [ref=f18e208] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/security_analysis
+                  - listitem [ref=f18e210]:
+                    - link "Deploy keys" [ref=f18e211] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/keys
+                  - listitem [ref=f18e213]:
+                    - button "Secrets and variables" [ref=f18e214] [cursor=pointer]
+            - listitem [aria-hidden] [ref=f18e216]
+            - listitem [ref=f18e217]:
+              - generic [ref=f18e220]:
+                - heading "Integrations" [level=2] [ref=f18e222]
+                - list "Integrations" [ref=f18e223]:
+                  - listitem [ref=f18e224]:
+                    - link "GitHub Apps" [ref=f18e225] [cursor=pointer]:
+                      - /url: /niktifin47/API-format-fix-final/settings/installations
+        - generic [ref=f18e230]:
+          - heading "Rulesets" [level=1] [ref=f18e233]
+          - generic [ref=f18e240]:
+            - heading "You haven't created any rulesets" [level=2] [ref=f18e241]
+            - paragraph [ref=f18e242]:
+              - text: Define whether collaborators can delete or force push and set requirements for any pushes, such as passing status checks or a linear commit history.
+              - link "Learn more about rulesets." [ref=f18e243] [cursor=pointer]:
+                - /url: https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets
+            - button "New ruleset" [expanded] [ref=f18e245] [cursor=pointer]
+  - contentinfo [ref=f18e248]:
+    - heading "Footer" [level=2] [ref=f18e249]
+    - generic [ref=f18e250]:
+      - generic [ref=f18e251]:
+        - link "GitHub Homepage" [ref=f18e252] [cursor=pointer]:
+          - /url: https://github.com
+        - generic [ref=f18e255]: © 2026 GitHub, Inc.
+      - navigation "Footer" [ref=f18e256]:
+        - heading "Footer navigation" [level=3] [ref=f18e257]
+        - list "Footer navigation" [ref=f18e258]:
+          - listitem [ref=f18e259]:
+            - link "Terms" [ref=f18e260] [cursor=pointer]:
+              - /url: https://docs.github.com/site-policy/github-terms/github-terms-of-service
+          - listitem [ref=f18e261]:
+            - link "Privacy" [ref=f18e262] [cursor=pointer]:
+              - /url: https://docs.github.com/site-policy/privacy-policies/github-privacy-statement
+          - listitem [ref=f18e263]:
+            - link "Security" [ref=f18e264] [cursor=pointer]:
+              - /url: https://github.com/security
+          - listitem [ref=f18e265]:
+            - link "Status" [ref=f18e266] [cursor=pointer]:
+              - /url: https://www.githubstatus.com/
+          - listitem [ref=f18e267]:
+            - link "Community" [ref=f18e268] [cursor=pointer]:
+              - /url: https://github.community/
+          - listitem [ref=f18e269]:
+            - link "Docs" [ref=f18e270] [cursor=pointer]:
+              - /url: https://docs.github.com/
+          - listitem [ref=f18e271]:
+            - link "Contact" [ref=f18e272] [cursor=pointer]:
+              - /url: https://support.github.com?tags=dotcom-footer
+          - listitem [ref=f18e273]:
+            - button "Manage cookies" [ref=f18e275] [cursor=pointer]
+          - listitem [ref=f18e276]:
+            - button "Do not share my personal information" [ref=f18e278] [cursor=pointer]

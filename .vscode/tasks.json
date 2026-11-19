@@ -1,0 +1,97 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Create Python environment",
+            "type": "process",
+            "command": "python3",
+            "args": ["-m", "venv", ".venv"],
+            "windows": {
+                "command": "python"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Install development dependencies",
+            "type": "process",
+            "command": ".venv/bin/python",
+            "windows": {
+                "command": ".venv\\Scripts\\python.exe"
+            },
+            "args": ["-m", "pip", "install", "-e", ".[all,dev]"],
+            "dependsOn": ["Create Python environment"],
+            "inAgents": true,
+            "runOptions": {
+                "runOn": "worktreeCreated"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "CLI diagnostics",
+            "type": "process",
+            "command": ".venv/bin/python",
+            "windows": {
+                "command": ".venv\\Scripts\\python.exe"
+            },
+            "args": ["-m", "api_format_fix.cli", "--diagnostics"],
+            "inAgents": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Python tests",
+            "type": "process",
+            "command": ".venv/bin/python",
+            "windows": {
+                "command": ".venv\\Scripts\\python.exe"
+            },
+            "args": ["-m", "pytest"],
+            "inAgents": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Lint Python",
+            "type": "process",
+            "command": ".venv/bin/python",
+            "windows": {
+                "command": ".venv\\Scripts\\python.exe"
+            },
+            "args": ["-m", "ruff", "check", "."],
+            "inAgents": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Python distributions",
+            "type": "process",
+            "command": ".venv/bin/python",
+            "windows": {
+                "command": ".venv\\Scripts\\python.exe"
+            },
+            "args": ["-m", "build"],
+            "inAgents": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Validate Android",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "gradlew",
+                ":android:testDebugUnitTest",
+                ":android:assembleDebug",
+                ":android:lintDebug",
+                "--no-daemon"
+            ],
+            "windows": {
+                "command": ".\\gradlew.bat",
+                "args": [
+                    ":android:testDebugUnitTest",
+                    ":android:assembleDebug",
+                    ":android:lintDebug",
+                    "--no-daemon"
+                ]
+            },
+            "inAgents": true,
+            "problemMatcher": []
+        }
+    ]
+}

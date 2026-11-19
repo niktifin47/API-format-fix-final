@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [ubuntu:22.04, ubuntu:24.04, debian:bookworm, fedora:latest]
+        image: [ubuntu:22.04, ubuntu:24.04, debian:bookworm, fedora:latest, archlinux:latest]
     steps:
       - uses: actions/checkout@v5
       - name: Test in Linux distribution container
@@ -47,10 +47,15 @@ jobs:
               if command -v apt-get >/dev/null 2>&1; then
                 apt-get update
                 apt-get install -y python3 python3-pip python3-venv
+              elif command -v pacman >/dev/null 2>&1; then
+                pacman -Syu --noconfirm python python-pip
+                PYTHON=python
               else
                 dnf install -y python3 python3-pip
+                PYTHON=python3
               fi
-              python3 -m venv /tmp/api-format-fix-venv
+              PYTHON="${PYTHON:-python3}"
+              "$PYTHON" -m venv /tmp/api-format-fix-venv
               /tmp/api-format-fix-venv/bin/python -m pip install -e ".[all,dev]"
               /tmp/api-format-fix-venv/bin/python -m ruff check .
               /tmp/api-format-fix-venv/bin/python -m pytest

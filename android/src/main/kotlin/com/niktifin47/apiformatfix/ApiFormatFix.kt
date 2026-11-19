@@ -13,14 +13,59 @@ import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.Writer
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
+import java.util.Collections
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.math.max
 import kotlin.math.roundToInt
 import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserException
+
+data class ResourceLimits(
+    val maxInputBytes: Long? = null,
+    val maxPdfPages: Int? = null,
+    val maxTextChars: Int? = null,
+    val maxDecompressedBytes: Long? = null,
+) {
+    init {
+        require(maxInputBytes == null || maxInputBytes > 0) {
+            "maxInputBytes must be a positive integer or null."
+        }
+        require(maxPdfPages == null || maxPdfPages > 0) {
+            "maxPdfPages must be a positive integer or null."
+        }
+        require(maxTextChars == null || maxTextChars > 0) {
+            "maxTextChars must be a positive integer or null."
+        }
+        require(maxDecompressedBytes == null || maxDecompressedBytes > 0) {
+            "maxDecompressedBytes must be a positive integer or null."
+        }
+    }
+}
+
+class ResourceLimitException(message: String) : IllegalArgumentException(message)
+
+class DocumentParseException(message: String, cause: Throwable? = null) :
+    IllegalArgumentException(message, cause)
+
+data class HiddenCharacterFinding(
+    val blockIndex: Int,
+    val offset: Int,
+    val codepoint: String,
+    val name: String,
+)
+
+data class FormatCapability(
+    val extension: String,
+    val canRead: Boolean,
+    val canWrite: Boolean,
+)
 
 data class FormatTemplate(
     val name: String,
@@ -52,6 +97,18 @@ object ApiFormatFix {
     private val colorPattern = Regex("#[0-9a-fA-F]{6}")
     private const val WORD_NAMESPACE =
         "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    private val formatCapabilities: Map<String, FormatCapability> =
+        Collections.unmodifiableMap(
+            (supportedInputs + supportedOutputs)
+                .sorted()
+                .associateWith { extension ->
+                    FormatCapability(
+                        extension = extension,
+                        canRead = extension in supportedInputs,
+                        canWrite = extension in supportedOutputs,
+                    )
+                },
+        )
 
     val templates = mapOf(
         "formal" to FormatTemplate("formal", "Times New Roman", 11f, 16f, "navy"),
@@ -64,13 +121,25 @@ object ApiFormatFix {
     )
 
     @JvmStatic
+    fun getFormatCapabilities(): Map<String, FormatCapability> = formatCapabilities
+
+    @JvmStatic
     fun formatText(
         inputData: String,
         inputFormat: String,
         outputFormat: String,
         preset: String = "formal",
         colorScheme: String? = null,
-    ): String = formatTextWithStyle(inputData, inputFormat, outputFormat, resolveStyle(preset, colorScheme))
+        resourceLimits: ResourceLimits? = null,
+        removeHiddenCharacters: Boolean = false,
+    ): String = formatTextWithStyle(
+        inputData,
+        inputFormat,
+        outputFormat,
+        resolveStyle(preset, colorScheme),
+        resourceLimits,
+        removeHiddenCharacters,
+    )
 
     @JvmStatic
     fun formatText(
@@ -79,11 +148,15 @@ object ApiFormatFix {
         outputFormat: String,
         preset: FormatTemplate,
         colorScheme: FormatColorScheme? = null,
+        resourceLimits: ResourceLimits? = null,
+        removeHiddenCharacters: Boolean = false,
     ): String = formatTextWithStyle(
         inputData,
         inputFormat,
         outputFormat,
         resolveStyle(preset, colorScheme),
+        resourceLimits,
+        removeHiddenCharacters,
     )
 
     private fun formatTextWithStyle(
@@ -91,6 +164,8 @@ object ApiFormatFix {
         inputFormat: String,
         outputFormat: String,
         style: DocumentStyle,
+        resourceLimits: ResourceLimits?,
+        removeHiddenCharacters: Boolean,
     ): String {
         val inputSuffix = normalizeSuffix(inputFormat)
         val outputSuffix = normalizeSuffix(outputFormat)
@@ -100,7 +175,13 @@ object ApiFormatFix {
         require(outputSuffix in setOf(".md", ".cv", ".html")) {
             "Text output supports only .md, .cv, and .html formats; use formatContent for DOCX/PDF."
         }
-        val document = parseMarkdown(inputData)
+        val inputSize = inputData.toByteArray(Charsets.UTF_8).size.toLong()
+        checkInputSize(inputSize, inputSuffix, resourceLimits)
+        var document = parseMarkdown(inputData)
+        checkTextSize(document, inputSuffix, resourceLimits)
+        if (removeHiddenCharacters) {
+            document = removeSuspiciousCharacters(document)
+        }
         return renderText(document, outputSuffix, style)
     }
 
@@ -112,6 +193,8 @@ object ApiFormatFix {
         outputFormat: String,
         preset: String = "formal",
         colorScheme: String? = null,
+        resourceLimits: ResourceLimits? = null,
+        removeHiddenCharacters: Boolean = false,
     ): ByteArray {
         require(normalizeSuffix(inputFormat) in textFormats) {
             "String input supports only .md, .cv, and .txt formats."
@@ -123,6 +206,8 @@ object ApiFormatFix {
             outputFormat,
             preset,
             colorScheme,
+            resourceLimits,
+            removeHiddenCharacters,
         )
     }
 
@@ -134,6 +219,8 @@ object ApiFormatFix {
         outputFormat: String,
         preset: FormatTemplate,
         colorScheme: FormatColorScheme? = null,
+        resourceLimits: ResourceLimits? = null,
+        removeHiddenCharacters: Boolean = false,
     ): ByteArray {
         require(normalizeSuffix(inputFormat) in textFormats) {
             "String input supports only .md, .cv, and .txt formats."
@@ -145,6 +232,8 @@ object ApiFormatFix {
             outputFormat,
             preset,
             colorScheme,
+            resourceLimits,
+            removeHiddenCharacters,
         )
     }
 
@@ -156,12 +245,16 @@ object ApiFormatFix {
         outputFormat: String,
         preset: String = "formal",
         colorScheme: String? = null,
+        resourceLimits: ResourceLimits? = null,
+        removeHiddenCharacters: Boolean = false,
     ): ByteArray = formatContentWithStyle(
         context,
         inputData,
         inputFormat,
         outputFormat,
         resolveStyle(preset, colorScheme),
+        resourceLimits,
+        removeHiddenCharacters,
     )
 
     @JvmStatic
@@ -172,12 +265,16 @@ object ApiFormatFix {
         outputFormat: String,
         preset: FormatTemplate,
         colorScheme: FormatColorScheme? = null,
+        resourceLimits: ResourceLimits? = null,
+        removeHiddenCharacters: Boolean = false,
     ): ByteArray = formatContentWithStyle(
         context,
         inputData,
         inputFormat,
         outputFormat,
         resolveStyle(preset, colorScheme),
+        resourceLimits,
+        removeHiddenCharacters,
     )
 
     private fun formatContentWithStyle(
@@ -186,6 +283,8 @@ object ApiFormatFix {
         inputFormat: String,
         outputFormat: String,
         style: DocumentStyle,
+        resourceLimits: ResourceLimits?,
+        removeHiddenCharacters: Boolean,
     ): ByteArray {
         val inputSuffix = normalizeSuffix(inputFormat)
         val outputSuffix = normalizeSuffix(outputFormat)
@@ -196,10 +295,9 @@ object ApiFormatFix {
             "Unsupported output format ${outputSuffix.ifEmpty { "(no extension)" }}."
         }
 
-        val document = when (inputSuffix) {
-            in textFormats -> parseMarkdown(decodeUtf8(inputData))
-            ".docx" -> parseDocx(inputData)
-            else -> parsePdf(context, inputData)
+        var document = parseDocument(context, inputData, inputSuffix, resourceLimits)
+        if (removeHiddenCharacters) {
+            document = removeSuspiciousCharacters(document)
         }
         return when (outputSuffix) {
             ".md", ".cv" -> renderMarkdown(document).toByteArray(Charsets.UTF_8)
@@ -219,6 +317,150 @@ object ApiFormatFix {
         .onUnmappableCharacter(CodingErrorAction.REPORT)
         .decode(ByteBuffer.wrap(data))
         .toString()
+
+    @JvmStatic
+    fun inspectText(
+        inputData: String,
+        inputFormat: String,
+        resourceLimits: ResourceLimits? = null,
+    ): List<HiddenCharacterFinding> {
+        val suffix = normalizeSuffix(inputFormat)
+        require(suffix in textFormats) {
+            "Text input supports only .md, .cv, and .txt formats."
+        }
+        checkInputSize(inputData.toByteArray(Charsets.UTF_8).size.toLong(), suffix, resourceLimits)
+        val document = parseMarkdown(inputData)
+        checkTextSize(document, suffix, resourceLimits)
+        return inspectDocument(document)
+    }
+
+    @JvmStatic
+    fun inspectContent(
+        context: Context,
+        inputData: String,
+        inputFormat: String,
+        resourceLimits: ResourceLimits? = null,
+    ): List<HiddenCharacterFinding> {
+        val suffix = normalizeSuffix(inputFormat)
+        require(suffix in textFormats) {
+            "String input supports only .md, .cv, and .txt formats."
+        }
+        return inspectContent(
+            context,
+            inputData.toByteArray(Charsets.UTF_8),
+            suffix,
+            resourceLimits,
+        )
+    }
+
+    @JvmStatic
+    fun inspectContent(
+        context: Context,
+        inputData: ByteArray,
+        inputFormat: String,
+        resourceLimits: ResourceLimits? = null,
+    ): List<HiddenCharacterFinding> {
+        val suffix = normalizeSuffix(inputFormat)
+        require(suffix in supportedInputs) {
+            "Unsupported input format ${suffix.ifEmpty { "(no extension)" }}."
+        }
+        return inspectDocument(parseDocument(context, inputData, suffix, resourceLimits))
+    }
+
+    private fun parseDocument(
+        context: Context,
+        inputData: ByteArray,
+        suffix: String,
+        resourceLimits: ResourceLimits?,
+    ): List<DocumentBlock> {
+        checkInputSize(inputData.size.toLong(), suffix, resourceLimits)
+        val document = when (suffix) {
+            in textFormats -> parseMarkdown(decodeUtf8(inputData))
+            ".docx" -> parseDocx(inputData, resourceLimits)
+            else -> parsePdf(context, inputData, resourceLimits)
+        }
+        checkTextSize(document, suffix, resourceLimits)
+        return document
+    }
+
+    private fun checkInputSize(size: Long, suffix: String, limits: ResourceLimits?) {
+        val maximum = limits?.maxInputBytes ?: return
+        if (size > maximum) {
+            throw ResourceLimitException(
+                "${suffix.uppercase(Locale.ROOT)} input exceeds configured maxInputBytes ($maximum).",
+            )
+        }
+    }
+
+    private fun checkTextSize(document: List<DocumentBlock>, suffix: String, limits: ResourceLimits?) {
+        val maximum = limits?.maxTextChars ?: return
+        var textSize = 0L
+        for (block in document) {
+            textSize += block.text.codePointCount(0, block.text.length)
+            if (textSize > maximum) {
+                throw ResourceLimitException(
+                    "${suffix.uppercase(Locale.ROOT)} input extracts more than the configured " +
+                        "maxTextChars ($maximum).",
+                )
+            }
+        }
+    }
+
+    private fun inspectDocument(document: List<DocumentBlock>): List<HiddenCharacterFinding> =
+        buildList {
+            document.forEachIndexed { blockIndex, block ->
+                var utf16Offset = 0
+                var codePointOffset = 0
+                while (utf16Offset < block.text.length) {
+                    val codePoint = block.text.codePointAt(utf16Offset)
+                    if (isSuspicious(codePoint)) {
+                        add(
+                            HiddenCharacterFinding(
+                                blockIndex = blockIndex,
+                                offset = codePointOffset,
+                                codepoint = "U+${codePoint.toString(16).uppercase(Locale.ROOT).padStart(4, '0')}",
+                                name = Character.getName(codePoint) ?: "UNNAMED CONTROL CHARACTER",
+                            ),
+                        )
+                    }
+                    utf16Offset += Character.charCount(codePoint)
+                    codePointOffset++
+                }
+            }
+        }
+
+    private fun removeSuspiciousCharacters(
+        document: List<DocumentBlock>,
+    ): List<DocumentBlock> = document.map { block ->
+        val cleaned = StringBuilder()
+        var offset = 0
+        while (offset < block.text.length) {
+            val codePoint = block.text.codePointAt(offset)
+            val isWhitespace = Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint)
+            when {
+                codePoint == 0x200D -> cleaned.appendCodePoint(codePoint)
+                isSuspicious(codePoint) && isWhitespace -> cleaned.append(' ')
+                isSuspicious(codePoint) -> Unit
+                else -> cleaned.appendCodePoint(codePoint)
+            }
+            offset += Character.charCount(codePoint)
+        }
+        DocumentBlock(block.kind, cleaned.toString())
+    }
+
+    private fun isSuspicious(codePoint: Int): Boolean {
+        if (codePoint == 0x09 || codePoint == 0x0A || codePoint == 0x0D ||
+            codePoint == 0x20 || codePoint == 0x200D
+        ) {
+            return false
+        }
+        val category = Character.getType(codePoint)
+        return Character.isWhitespace(codePoint) ||
+            Character.isSpaceChar(codePoint) ||
+            category == Character.CONTROL.toInt() ||
+            category == Character.FORMAT.toInt() ||
+            category == Character.SURROGATE.toInt()
+    }
 
     private fun resolveStyle(preset: String, colorScheme: String?): DocumentStyle {
         val template = templates[preset] ?: throw IllegalArgumentException(
@@ -396,59 +638,98 @@ ${output.joinToString("\n")}
             .replace(Regex("`(.+?)`"), "<code>$1</code>")
     }
 
-    private fun parseDocx(data: ByteArray): List<DocumentBlock> {
-        var documentXml: ByteArray? = null
-        ZipInputStream(ByteArrayInputStream(data)).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                if (entry.name == "word/document.xml") {
-                    documentXml = zip.readBytes()
-                    break
+    private fun parseDocx(data: ByteArray, limits: ResourceLimits?): List<DocumentBlock> {
+        val xml = try {
+            ZipInputStream(ByteArrayInputStream(data)).use { zip ->
+                var documentXml: ByteArray? = null
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    if (entry.name == "word/document.xml") {
+                        documentXml = readEntry(zip, limits?.maxDecompressedBytes)
+                        break
+                    }
                 }
+                documentXml
             }
-        }
-        val xml = documentXml ?: throw IllegalArgumentException("DOCX archive has no word/document.xml.")
-        val parser = Xml.newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false)
-        parser.setInput(ByteArrayInputStream(xml), "UTF-8")
-        val blocks = mutableListOf<DocumentBlock>()
-        var insideParagraph = false
-        var hasNumbering = false
-        var paragraphStyle = ""
-        var paragraphText = StringBuilder()
-        var event = parser.eventType
-        while (event != XmlPullParser.END_DOCUMENT) {
-            when (event) {
-                XmlPullParser.START_TAG -> when (parser.name) {
-                    "p" -> {
-                        insideParagraph = true
-                        hasNumbering = false
-                        paragraphStyle = ""
-                        paragraphText = StringBuilder()
+        } catch (error: IOException) {
+            throw DocumentParseException("Could not read DOCX document: ${error.message}", error)
+        } ?: throw DocumentParseException("Could not read DOCX document: missing word/document.xml.")
+
+        try {
+            val parser = Xml.newPullParser()
+            parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false)
+            parser.setInput(ByteArrayInputStream(xml), "UTF-8")
+            val blocks = mutableListOf<DocumentBlock>()
+            var extractedChars = 0L
+            var insideParagraph = false
+            var hasNumbering = false
+            var paragraphStyle = ""
+            var paragraphText = StringBuilder()
+            var event = parser.eventType
+            while (event != XmlPullParser.END_DOCUMENT) {
+                when (event) {
+                    XmlPullParser.START_TAG -> when (parser.name) {
+                        "p" -> {
+                            insideParagraph = true
+                            hasNumbering = false
+                            paragraphStyle = ""
+                            paragraphText = StringBuilder()
+                        }
+                        "pStyle" -> if (insideParagraph) {
+                            paragraphStyle = parser.getAttributeValue(WORD_NAMESPACE, "val")
+                                ?: parser.getAttributeValue(null, "val")
+                                ?: ""
+                        }
+                        "numPr" -> if (insideParagraph) hasNumbering = true
+                        "t" -> if (insideParagraph) {
+                            val text = parser.nextText()
+                            extractedChars += text.codePointCount(0, text.length)
+                            checkTextSize(extractedChars, ".docx", limits)
+                            paragraphText.append(text)
+                        }
                     }
-                    "pStyle" -> if (insideParagraph) {
-                        paragraphStyle = parser.getAttributeValue(WORD_NAMESPACE, "val")
-                            ?: parser.getAttributeValue(null, "val")
-                            ?: ""
+                    XmlPullParser.END_TAG -> if (parser.name == "p" && insideParagraph) {
+                        val heading = Regex("heading\\s*(\\d+)", RegexOption.IGNORE_CASE)
+                            .find(paragraphStyle)
+                        val kind = when {
+                            heading != null ->
+                                "heading${heading.groupValues[1].toInt().coerceIn(1, 6)}"
+                            hasNumbering || paragraphStyle.contains("list", ignoreCase = true) ->
+                                "list_item"
+                            else -> "paragraph"
+                        }
+                        if (paragraphText.isNotEmpty()) {
+                            blocks += DocumentBlock(kind, paragraphText.toString())
+                        }
+                        insideParagraph = false
                     }
-                    "numPr" -> if (insideParagraph) hasNumbering = true
-                    "t" -> if (insideParagraph) paragraphText.append(parser.nextText())
                 }
-                XmlPullParser.END_TAG -> if (parser.name == "p" && insideParagraph) {
-                    val heading = Regex("heading\\s*(\\d+)", RegexOption.IGNORE_CASE)
-                        .find(paragraphStyle)
-                    val kind = when {
-                        heading != null -> "heading${heading.groupValues[1].toInt().coerceIn(1, 6)}"
-                        hasNumbering || paragraphStyle.contains("list", ignoreCase = true) -> "list_item"
-                        else -> "paragraph"
-                    }
-                    if (paragraphText.isNotEmpty()) blocks += DocumentBlock(kind, paragraphText.toString())
-                    insideParagraph = false
-                }
+                event = parser.next()
             }
-            event = parser.next()
+            return blocks
+        } catch (error: XmlPullParserException) {
+            throw DocumentParseException("Could not read DOCX document: ${error.message}", error)
+        } catch (error: IOException) {
+            throw DocumentParseException("Could not read DOCX document: ${error.message}", error)
         }
-        return blocks
+    }
+
+    private fun readEntry(zip: ZipInputStream, maximumBytes: Long?): ByteArray {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var total = 0L
+        while (true) {
+            val count = zip.read(buffer)
+            if (count < 0) break
+            total += count
+            if (maximumBytes != null && total > maximumBytes) {
+                throw ResourceLimitException(
+                    "DOCX input exceeds configured maxDecompressedBytes ($maximumBytes).",
+                )
+            }
+            output.write(buffer, 0, count)
+        }
+        return output.toByteArray()
     }
 
     private fun renderDocx(document: List<DocumentBlock>, style: DocumentStyle): ByteArray {
@@ -509,11 +790,76 @@ $headings
         zip.closeEntry()
     }
 
-    private fun parsePdf(context: Context, data: ByteArray): List<DocumentBlock> {
+    private fun parsePdf(
+        context: Context,
+        data: ByteArray,
+        limits: ResourceLimits?,
+    ): List<DocumentBlock> {
         PDFBoxResourceLoader.init(context.applicationContext)
-        PDDocument.load(ByteArrayInputStream(data)).use { pdf ->
-            return parseMarkdown(PDFTextStripper().getText(pdf))
+        try {
+            PDDocument.load(ByteArrayInputStream(data)).use { pdf ->
+                val maximumPages = limits?.maxPdfPages
+                if (maximumPages != null && pdf.numberOfPages > maximumPages) {
+                    throw ResourceLimitException(
+                        "PDF contains ${pdf.numberOfPages} pages; configured maxPdfPages is " +
+                            "$maximumPages.",
+                    )
+                }
+                val maximumChars = limits?.maxTextChars
+                val text = if (maximumChars == null) {
+                    PDFTextStripper().getText(pdf)
+                } else {
+                    val writer = LimitedWriter(maximumChars.toLong())
+                    PDFTextStripper().writeText(pdf, writer)
+                    writer.toString()
+                }
+                return parseMarkdown(text)
+            }
+        } catch (error: IOException) {
+            throw DocumentParseException("Could not read PDF document: ${error.message}", error)
         }
+    }
+
+    private fun checkTextSize(size: Long, suffix: String, limits: ResourceLimits?) {
+        val maximum = limits?.maxTextChars ?: return
+        if (size > maximum) {
+            throw ResourceLimitException(
+                "${suffix.uppercase(Locale.ROOT)} input extracts more than the configured " +
+                    "maxTextChars ($maximum).",
+            )
+        }
+    }
+
+    private class LimitedWriter(private val maximumChars: Long) : Writer() {
+        private val contents = StringBuilder()
+        private var characterCount = 0L
+        private var previousWasHighSurrogate = false
+
+        override fun write(buffer: CharArray, offset: Int, length: Int) {
+            var additionalCharacters = 0L
+            var lastWasHighSurrogate = previousWasHighSurrogate
+            for (index in offset until offset + length) {
+                val character = buffer[index]
+                if (!lastWasHighSurrogate || !Character.isLowSurrogate(character)) {
+                    additionalCharacters++
+                }
+                lastWasHighSurrogate = Character.isHighSurrogate(character)
+            }
+            if (characterCount + additionalCharacters > maximumChars) {
+                throw ResourceLimitException(
+                    "PDF input extracts more than the configured maxTextChars ($maximumChars).",
+                )
+            }
+            contents.append(buffer, offset, length)
+            characterCount += additionalCharacters
+            previousWasHighSurrogate = lastWasHighSurrogate
+        }
+
+        override fun flush() = Unit
+
+        override fun close() = Unit
+
+        override fun toString(): String = contents.toString()
     }
 
     private fun renderPdf(context: Context, document: List<DocumentBlock>, style: DocumentStyle): ByteArray {
