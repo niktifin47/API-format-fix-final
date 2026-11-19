@@ -1,3 +1,5 @@
+__version__ = "0.1.0"
+
 from .errors import DocumentParseError, ResourceLimitError
 from .models import (
     COLOR_SCHEMES,
@@ -41,6 +43,7 @@ __all__ = [
     "ResourceLimitError",
     "ResourceLimits",
     "Template",
+    "__version__",
     "format_content",
     "format_file",
     "get_format_capabilities",

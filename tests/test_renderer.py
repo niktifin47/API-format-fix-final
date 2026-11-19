@@ -131,11 +131,26 @@ def test_rtf_input_decodes_ansi_codepage(header: bytes, encoding: str, text: str
     assert format_content(source, ".rtf", ".md") == f"{text}\n"
 
 
-def test_rtf_input_reports_unsupported_ansi_codepage():
+def test_rtf_input_falls_back_for_unknown_ansi_codepage():
     source = b"{\\rtf1\\ansi\\ansicpg999999 text}"
 
-    with pytest.raises(DocumentParseError, match="Could not decode RTF document"):
-        format_content(source, ".rtf", ".md")
+    assert format_content(source, ".rtf", ".md") == "text\n"
+
+
+def test_rtf_input_respects_max_input_bytes():
+    source = b"{\\rtf1\\ansi text}"
+    with pytest.raises(ResourceLimitError, match="max_input_bytes"):
+        format_content(source, ".rtf", ".md", resource_limits=ResourceLimits(max_input_bytes=4))
+
+
+def test_rtf_input_decodes_hex_escapes_in_group_using_declared_codepage():
+    text = "\u041f\u0440\u0438\u0432\u0435\u0442"
+    hex_bytes = b"".join(
+        f"\\'{byte:02x}".encode("ascii") for byte in text.encode("cp1251")
+    )
+    source = b"{\\rtf1\\ansi\\ansicpg1251 {\\b " + hex_bytes + b"}\\par}"
+
+    assert format_content(source, ".rtf", ".md") == f"{text}\n"
 
 
 def test_hidden_unicode_is_reported_and_only_removed_when_requested(tmp_path: Path):
@@ -276,6 +291,22 @@ def test_malformed_docx_xml_has_a_concise_format_error():
 
     with pytest.raises(DocumentParseError, match="Could not read DOCX document"):
         format_content(malformed.getvalue(), ".docx", ".md")
+
+
+def test_docx_split_runs_preserve_unicode_and_escape_html():
+    from docx import Document as WordDocument
+
+    source = BytesIO()
+    document = WordDocument()
+    paragraph = document.add_paragraph()
+    paragraph.add_run("caf\u00e9 ")
+    paragraph.add_run("<script>alert(1)</script>")
+    document.save(source)
+
+    rendered = format_content(source.getvalue(), ".docx", ".html")
+
+    assert "<p>caf\u00e9 &lt;script&gt;alert(1)&lt;/script&gt;</p>" in rendered
+    assert "<script>" not in rendered
 
 
 def test_malformed_odt_is_reported_with_format_context():
