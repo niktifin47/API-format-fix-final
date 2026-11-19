@@ -1,0 +1,11 @@
+{
+    "git.terminalAuthentication": true,
+    "git.useIntegratedAskPass": true,
+    "github.gitAuthentication": true,
+    "chat.tools.terminal.autoApprove": {
+        "/^git status(?:\\s|$)/": true,
+        "/^git (?:diff|log|branch|show)(?:\\s|$)/": true,
+        "/^git remote -v(?:\\s|$)/": true,
+        "/^git (?:add|commit|push|pull|merge|rebase|reset|clean|checkout|switch|tag)(?:\\s|$)/": false
+    }
+}

@@ -76,6 +76,23 @@ jobs:
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - run: bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug --no-daemon
 
+  ci-status:
+    name: CI
+    if: ${{ always() }}
+    needs: [test, linux-distros, android]
+    runs-on: ubuntu-latest
+    env:
+      TEST_RESULT: ${{ needs.test.result }}
+      DISTRO_RESULT: ${{ needs.linux-distros.result }}
+      ANDROID_RESULT: ${{ needs.android.result }}
+    steps:
+      - name: Verify CI jobs passed
+        run: |
+          if [ "$TEST_RESULT" != "success" ] || [ "$DISTRO_RESULT" != "success" ] || [ "$ANDROID_RESULT" != "success" ]; then
+            echo "test=$TEST_RESULT linux-distros=$DISTRO_RESULT android=$ANDROID_RESULT"
+            exit 1
+          fi
+
   failure-diagnostics:
     if: ${{ always() && (needs.test.result == 'failure' || needs.linux-distros.result == 'failure' || needs.android.result == 'failure') }}
     needs: [test, linux-distros, android]

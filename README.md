@@ -1,8 +1,8 @@
 # API Format Fix
 
-API Format Fix is a Python library and command-line tool for extracting text from common document formats and applying reusable styles. It supports Markdown, CV, TXT, HTML, reStructuredText, TeX, RTF, ODT, DOCX, and PDF as inputs, and converts extracted text to Markdown, HTML, DOCX, or PDF.
+API Format Fix is a cross-platform Python library and command-line tool that extracts text from common document formats and applies reusable styles. It supports Markdown, CV, TXT, HTML, reStructuredText, TeX, RTF, ODT, DOCX, and PDF as inputs and converts extracted text to Markdown, HTML, DOCX, or PDF.
 
-The first release focuses on reliable text extraction and consistent restyling. Converting an existing DOCX or PDF extracts its text; it does not preserve the original page layout, images, tables, or advanced formatting.
+The initial release focuses on reliable text extraction and consistent restyling. Converting an existing DOCX or PDF extracts its text; it does not preserve the original page layout, images, tables, or advanced formatting.
 
 ## Install
 
@@ -20,13 +20,13 @@ python -m pip install -e ".[all,dev]"
 
 RTF and ODT readers can also be installed separately with `.[rtf]` and `.[odt]`.
 
-For a tagged GitHub Release, install the wheel directly without publishing this project to PyPI:
+For a tagged GitHub release, install the wheel directly without publishing this project to PyPI:
 
 ```shell
 python -m pip install "api-format-fix[all] @ https://github.com/niktifin47/API-format-fix-final/releases/download/v0.1.0/api_format_fix-0.1.0-py3-none-any.whl"
 ```
 
-Pip still downloads the optional format dependencies from its configured package index.
+pip still downloads the optional format dependencies from its configured package index.
 
 ## Quick start
 
@@ -59,7 +59,7 @@ format_file(
 )
 ```
 
-Use the command line:
+Use the command-line interface:
 
 ```shell
 api-format-fix resume.md resume.docx --preset friendly
@@ -182,11 +182,11 @@ Built-in presets:
 | `formal` | Times New Roman | 11 pt | `navy` |
 | `friendly` | Arial | 11 pt | `teal` |
 
-Built-in color schemes include `navy`, `teal`, and 100 generated, distinct `spectrum-001` through `spectrum-100` palettes. In Python, `format_file` also accepts custom `Template` and `ColorScheme` objects. Use `font_family` in Python or `--font-family` in the CLI to choose among the supported font-family names. Twenty-one additional freely licensed family names are provided: Alegreya, Atkinson Hyperlegible, Carlito, DejaVu Sans, Fira Sans, IBM Plex Sans, Inter, Lato, Liberation Sans, Merriweather, Montserrat, Noto Sans, Noto Serif, Nunito, Open Sans, PT Sans, Poppins, Roboto, Source Sans 3, Source Serif 4, and Ubuntu. Arial and Times New Roman remain available for compatibility. The library does not bundle font files; font availability depends on the target system. PDF uses ReportLab's built-in Helvetica or Times family, so other selected font names do not embed or provision fonts for PDF output.
+Built-in color schemes include `navy`, `teal`, and 100 distinct generated palettes, `spectrum-001` through `spectrum-100`. In Python, `format_file` also accepts custom `Template` and `ColorScheme` objects. Use `font_family` in Python or `--font-family` in the CLI to choose among the supported font-family names. Twenty-one additional freely licensed font family names are provided: Alegreya, Atkinson Hyperlegible, Carlito, DejaVu Sans, Fira Sans, IBM Plex Sans, Inter, Lato, Liberation Sans, Merriweather, Montserrat, Noto Sans, Noto Serif, Nunito, Open Sans, PT Sans, Poppins, Roboto, Source Sans 3, Source Serif 4, and Ubuntu. Arial and Times New Roman remain available for compatibility. The library does not bundle font files; font availability depends on the target system. PDF output uses ReportLab's built-in Helvetica or Times family, so other selected font names do not embed or provide fonts for PDF output.
 
 ## Unicode inspection and safety limits
 
-Extracted text is scanned for Unicode control/format characters that can be invisible, including bidi controls, zero-width spaces, and unusual Unicode whitespace. Findings are reported as Python `UserWarning`s and are available through `inspect_document` / `inspect_file`. The CLI asks before cleanup interactively; use `--remove-hidden-characters` for an explicit non-interactive opt-in. Cleanup preserves the zero-width joiner used in emoji sequences, removes flagged controls, and normalizes unusual whitespace to a standard space. No content is modified by default.
+Extracted text is scanned for Unicode control/format characters that can be invisible, including bidirectional controls, zero-width spaces, and unusual Unicode whitespace. Findings are reported as Python `UserWarning`s and are available through `inspect_document` / `inspect_file`. The CLI asks before cleanup interactively; use `--remove-hidden-characters` for an explicit non-interactive opt-in. Cleanup preserves the zero-width joiner used in emoji sequences, removes flagged controls, and normalizes unusual whitespace to a standard space. No content is modified by default.
 
 This character scan is a review aid, **not malware detection or a security guarantee**. It cannot determine whether a character, font, color, signature, image, 3D asset, animation frame, or embedded object is malicious. This library does not inspect images, 3D models, animations, or digital signatures; it does not anonymize, validate, or protect signatures against copying or identity fraud. Do not rely on it to verify document authenticity or prevent phishing, malware, or identity theft. Integrating add-ons or modifying the code may introduce additional security risks; review dependencies and changes independently. Configure `ResourceLimits` and isolate processing when handling untrusted files.
 
@@ -200,7 +200,7 @@ python -m build
 
 Pull requests run the Python checks in GitHub Actions on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Linux container checks for Ubuntu 22.04/24.04, Debian, Fedora, and Arch Linux. This validates the CLI/library in those operating-system environments; it does not emulate GUI desktop workspaces or iOS. A separate Linux job tests, builds, and lints the Android module. When CI fails, a diagnostic job reruns Python checks with verbose output on Ubuntu/Python 3.12 and summarizes each result; compare it with the original matrix job for platform-only failures. CodeQL runs as a separate security analysis and must be reviewed independently—test/build failures are not themselves a security assessment. Run the same Android checks locally with `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS. Pushing a `v*` tag builds source and wheel distributions and attaches them to a GitHub Release. Publishing to PyPI is not configured by default.
 
-The same release workflow also builds a self-contained Windows CLI ZIP, generates Winget manifests with its release URL and SHA-256 checksum of that release asset, and attaches a `SHA256SUMS.txt` file for the release artifacts. Submit those manifests to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to make `winget install niktifin47.APIFormatFix` available after Microsoft accepts the package. No Winget submission or npm publication is made by this repository workflow; both require maintainer-controlled registry accounts and review. A published checksum is only available after a maintainer creates and tests a tagged release.
+The same release workflow also builds a self-contained Windows CLI ZIP, generates WinGet manifests with the release URL and SHA-256 checksum of that release asset, and attaches a `SHA256SUMS.txt` file for the release artifacts. Submit those manifests to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to make `winget install niktifin47.APIFormatFix` available after Microsoft accepts the package. No WinGet submission or npm publication is made by this repository's workflow; both require maintainer-controlled registry accounts and review. A published checksum becomes available only after a maintainer creates and tests a tagged release.
 
 ## License
 
