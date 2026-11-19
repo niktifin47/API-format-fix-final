@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "api-format-fix"
-version = "0.1.0"
-description = "Extract and restyle text from common document formats."
+version = "0.1.1"
+description = "Extract, restyle, and convert text across common document formats."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"
@@ -40,6 +40,11 @@ all = [
 ]
 dev = ["pytest>=8", "ruff>=0.6", "build>=1"]
 windows = ["pyinstaller>=6"]
+
+[project.urls]
+Homepage = "https://github.com/niktifin47/document-format-toolkit"
+Repository = "https://github.com/niktifin47/document-format-toolkit"
+PyPI = "https://pypi.org/project/api-format-fix/"
 
 [project.scripts]
 api-format-fix = "api_format_fix.cli:main"

@@ -20,13 +20,19 @@ python -m pip install -e ".[all,dev]"
 
 RTF and ODT readers can also be installed separately with `.[rtf]` and `.[odt]`.
 
-For a tagged GitHub release, install the wheel directly without publishing this project to PyPI:
+Install the package and all optional format dependencies from PyPI:
 
 ```shell
-python -m pip install "api-format-fix[all] @ https://github.com/niktifin47/API-format-fix-final/releases/download/v0.1.0/api_format_fix-0.1.0-py3-none-any.whl"
+python -m pip install "api-format-fix[all]"
 ```
 
 pip still downloads the optional format dependencies from its configured package index.
+
+For a tagged GitHub release, install the wheel directly from GitHub:
+
+```shell
+python -m pip install "api-format-fix[all] @ https://github.com/niktifin47/document-format-toolkit/releases/download/v0.1.1/api_format_fix-0.1.1-py3-none-any.whl"
+```
 
 ## Quick start
 
@@ -161,7 +167,7 @@ python -m ruff check .
 python -m build
 ```
 
-Pull requests run the Python checks in GitHub Actions on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Linux container checks for Ubuntu 22.04/24.04, Debian, and Fedora. This validates the CLI/library in those operating-system environments; it does not emulate GUI desktop workspaces or iOS. A separate Linux job tests, builds, and lints the Android module. When CI fails, a diagnostic job reruns Python checks with verbose output on Ubuntu/Python 3.12 and summarizes each result; compare it with the original matrix job for platform-only failures. CodeQL runs as a separate security analysis and must be reviewed independently—test/build failures are not themselves a security assessment. Run the same Android checks locally with `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS. Pushing a tag whose name starts with `v` builds source and wheel distributions and attaches them to a GitHub Release. Publishing to PyPI is not configured by default.
+Pull requests run the Python checks in GitHub Actions on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Linux container checks for Ubuntu 22.04/24.04, Debian, and Fedora. This validates the CLI/library in those operating-system environments; it does not emulate GUI desktop workspaces or iOS. A separate Linux job tests, builds, and lints the Android module. When CI fails, a diagnostic job reruns Python checks with verbose output on Ubuntu/Python 3.12 and summarizes each result; compare it with the original matrix job for platform-only failures. CodeQL runs as a separate security analysis and must be reviewed independently—test/build failures are not themselves a security assessment. Run the same Android checks locally with `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS. Pushing a tag whose name starts with `v` builds source and wheel distributions, publishes them to PyPI through GitHub Actions Trusted Publishing, and attaches the release assets to a GitHub Release.
 
 The same release workflow also builds a self-contained Windows CLI ZIP, generates WinGet manifests with the release URL and SHA-256 checksum of that release asset, and attaches a `SHA256SUMS.txt` file for the release artifacts. Submit those manifests to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to make `winget install niktifin47.APIFormatFix` available after Microsoft accepts the package. No WinGet submission or npm publication is made by this repository's workflow; both require maintainer-controlled registry accounts and review. A published checksum becomes available only after a maintainer creates and tests a tagged release.
 
