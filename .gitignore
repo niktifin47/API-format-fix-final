@@ -1,3 +1,7 @@
+# Node.js (npm package in ./npm)
+node_modules/
+*.tgz
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

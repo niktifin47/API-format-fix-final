@@ -166,7 +166,19 @@ val markdown = ApiFormatFix.formatContent(
 )
 ```
 
-All limits default to `null` (unlimited). `maxDecompressedBytes` bounds the DOCX `word/document.xml` entry; it does not cap total ZIP expansion. PDF page and text limits are checked during extraction, but PDFBox must load the PDF first, so they do not bound parser memory or CPU. Inspect findings are returned without changing content; cleanup is opt-in and preserves emoji joiners. Limits are not a parser sandbox: callers should constrain input paths and isolate processing of hostile files. Include the `android` directory as an Android library Gradle subproject; no Maven publication is configured. Python and Kotlin implementations are maintained as separate libraries.
+All limits default to `null` (unlimited). `maxDecompressedBytes` bounds the DOCX `word/document.xml` entry; it does not cap total ZIP expansion. PDF page and text limits are checked during extraction, but PDFBox must load the PDF first, so they do not bound parser memory or CPU. Inspect findings are returned without changing content; cleanup is opt-in and preserves emoji joiners. Limits are not a parser sandbox: callers should constrain input paths and isolate processing of hostile files. Include the `android` directory as an Android library Gradle subproject; no Maven publication is configured. The Python, Kotlin, and TypeScript implementations are maintained as separate libraries.
+
+## npm and Node.js
+
+The `npm` directory contains a native TypeScript implementation for Node.js 22.13 or later, named `@niktifin47/api-format-fix`. It has no Python dependency and supports the same input and output formats, presets, color schemes, hidden-character scan, and resource limits as the Python package, through an asynchronous API:
+
+```ts
+import { formatFile } from "@niktifin47/api-format-fix";
+
+await formatFile("resume.cv", "resume.pdf", { preset: "formal", colorScheme: "navy" });
+```
+
+DOCX, ODT, and RTF need no extra packages; PDF input and output use the optional `pdfjs-dist` and `pdfkit` packages. See [npm/README.md](npm/README.md) for installation, the API, the `api-format-fix` command, and the deliberate differences from the Python package.
 
 ## Platform and distribution support
 
@@ -175,7 +187,7 @@ All limits default to `null` (unlimited). `maxDecompressedBytes` bounds the DOCX
 | Windows x64 | Python package, plus a self-contained CLI EXE distributed inside a ZIP. Keep the ZIP as the only native artifact for now; MSI installation/update lifecycle and x86 dependency packaging are not justified by current demand. |
 | Linux | Python package. CI checks Ubuntu 22.04/24.04, Debian, Fedora, and Arch Linux containers; distro installers and desktop-environment integrations are not provided. |
 | macOS | Python package, covered by the CI OS matrix. No native macOS installer is provided. |
-| npm / Node.js | No npm package or JavaScript API is provided. |
+| npm / Node.js | Native TypeScript package `@niktifin47/api-format-fix` in the `npm` directory (Node.js 22.13 or later). Publishing it to npm is a manual maintainer step. |
 | iOS | No iOS runtime or native package is provided. |
 | Android / Kotlin | Native Kotlin Android library in the `android` Gradle module (minimum SDK 23). It is not published to Maven Central. |
 
@@ -204,9 +216,19 @@ python -m ruff check .
 python -m build
 ```
 
-Pull requests run the Python tests in GitHub Actions on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Linux container checks for Ubuntu 22.04/24.04, Debian, Fedora, and Arch Linux. Ruff and the package build run once in a shared quality job; dependency caches and cancellation of superseded runs avoid repeated work without reducing test coverage. This validates the CLI/library in those operating-system environments; it does not emulate GUI desktop workspaces or iOS. A separate Linux job tests, builds, and lints the Android module. Every job preserves its original logs and reports as downloadable artifacts for 14 days, including Python runtime/dependency versions and JUnit results, or Android test/lint reports. All Python tests automatically use detailed failure diagnostics and write `reports/pytest.xml` locally as well; see [Contributing](CONTRIBUTING.md#test-performance-and-failure-reports) for reproduction and performance guidance. CodeQL runs as a separate security analysis and must be reviewed independently—test/build failures are not themselves a security assessment. Run the same Android checks locally with `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS. Pushing a tag whose name starts with `v` builds source and wheel distributions, publishes them to PyPI through GitHub Actions Trusted Publishing, and attaches the release assets to a GitHub Release.
+The TypeScript package in `npm` is validated separately (Node.js 22.18 or later, because the tests run TypeScript directly):
 
-The same release workflow also builds a self-contained Windows CLI ZIP, generates WinGet manifests with the release URL and SHA-256 checksum of that release asset, and attaches a `SHA256SUMS.txt` file for the release artifacts. Submit those manifests to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to make `winget install niktifin47.APIFormatFix` available after Microsoft accepts the package. No WinGet submission or npm publication is made by this repository's workflow; both require maintainer-controlled registry accounts and review. A published checksum becomes available only after a maintainer creates and tests a tagged release.
+```shell
+cd npm
+npm ci
+npm run typecheck
+npm test
+npm run build
+```
+
+Pull requests run the Python tests in GitHub Actions on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Linux container checks for Ubuntu 22.04/24.04, Debian, Fedora, and Arch Linux. Ruff and the package build run once in a shared quality job; dependency caches and cancellation of superseded runs avoid repeated work without reducing test coverage. This validates the CLI/library in those operating-system environments; it does not emulate GUI desktop workspaces or iOS. A separate Linux job tests, builds, and lints the Android module, and another type-checks, tests, builds, and previews the npm package on Node.js 22 and 24. Every job preserves its original logs and reports as downloadable artifacts for 14 days, including Python runtime/dependency versions and JUnit results, Android test/lint reports, or npm logs. All Python tests automatically use detailed failure diagnostics and write `reports/pytest.xml` locally as well; see [Contributing](CONTRIBUTING.md#test-performance-and-failure-reports) for reproduction and performance guidance. CodeQL runs as a separate security analysis and must be reviewed independently—test/build failures are not themselves a security assessment. Run the same Android checks locally with `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS. Pushing a tag whose name starts with `v` builds source and wheel distributions, publishes them to PyPI through GitHub Actions Trusted Publishing, and attaches the release assets to a GitHub Release.
+
+The same release workflow also builds a self-contained Windows CLI ZIP, generates WinGet manifests with the release URL and SHA-256 checksum of that release asset, and attaches a `SHA256SUMS.txt` file for the release artifacts. Submit those manifests to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to make `winget install niktifin47.APIFormatFix` available after Microsoft accepts the package. No WinGet submission or npm publication is made by this repository's workflow; both require maintainer-controlled registry accounts and review. To publish the npm package, a maintainer runs `npm publish` in the `npm` directory (it builds first and is configured as public). A published checksum becomes available only after a maintainer creates and tests a tagged release.
 
 ## License
 
