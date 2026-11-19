@@ -229,10 +229,54 @@ jobs:
             android/build/test-results/
           retention-days: 14
 
+  npm:
+    name: npm (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["22", "24"]
+    defaults:
+      run:
+        shell: bash
+        working-directory: npm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: npm/package-lock.json
+      - name: Install dependencies
+        run: |
+          mkdir -p reports
+          npm ci 2>&1 | tee reports/install.log
+      - name: Record environment
+        if: ${{ always() }}
+        run: |
+          mkdir -p reports
+          { node --version; npm --version; npm ls --all; } > reports/environment.txt 2>&1 || true
+      - name: Type check
+        run: npm run typecheck 2>&1 | tee reports/typecheck.log
+      - name: Test
+        run: npm test 2>&1 | tee reports/test.log
+      - name: Build and inspect package contents
+        if: ${{ !cancelled() }}
+        run: |
+          npm run build 2>&1 | tee reports/build.log
+          npm pack --dry-run 2>&1 | tee reports/pack.log
+      - name: Upload npm diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-node-${{ matrix.node-version }}-reports
+          path: npm/reports/
+          retention-days: 14
+
   ci-status:
     name: CI
     if: ${{ always() }}
-    needs: [quality, test, test-macos, linux-distros, android]
+    needs: [quality, test, test-macos, linux-distros, android, npm]
     runs-on: ubuntu-latest
     env:
       QUALITY_RESULT: ${{ needs.quality.result }}
@@ -240,6 +284,7 @@ jobs:
       MACOS_RESULT: ${{ needs.test-macos.result }}
       DISTRO_RESULT: ${{ needs.linux-distros.result }}
       ANDROID_RESULT: ${{ needs.android.result }}
+      NPM_RESULT: ${{ needs.npm.result }}
     steps:
       - name: Verify CI jobs passed
         run: |
@@ -252,13 +297,15 @@ jobs:
             echo "| Python macOS 3.10-3.14 | $MACOS_RESULT |"
             echo "| Linux distributions | $DISTRO_RESULT |"
             echo "| Android | $ANDROID_RESULT |"
+            echo "| npm (Node 22 and 24) | $NPM_RESULT |"
             echo
             echo "Download the reports artifact for the original failing job: logs, runtime/dependency versions, and test reports."
             echo 'Python: install `python -m pip install -e ".[all,dev]"` using the failing OS/Python version, then run `python -m pytest "tests/test_file.py::test_name"` with the node ID from the failure summary.'
             echo 'Android: run `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug --continue --stacktrace --console=plain` (use `.\gradlew.bat` on Windows).'
+            echo 'npm: in the `npm` directory run `npm ci && npm run typecheck && npm test` (Node.js 22.18 or later).'
             echo "CodeQL is separate; passing tests do not establish security."
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$QUALITY_RESULT" != "success" ] || [ "$TEST_RESULT" != "success" ] || [ "$MACOS_RESULT" != "success" ] || [ "$DISTRO_RESULT" != "success" ] || [ "$ANDROID_RESULT" != "success" ]; then
+          if [ "$QUALITY_RESULT" != "success" ] || [ "$TEST_RESULT" != "success" ] || [ "$MACOS_RESULT" != "success" ] || [ "$DISTRO_RESULT" != "success" ] || [ "$ANDROID_RESULT" != "success" ] || [ "$NPM_RESULT" != "success" ]; then
             exit 1
           fi
 

@@ -5,4 +5,5 @@
 - Preserve explicit errors for unsupported formats and missing optional dependencies.
 - Add or update focused tests for every format or preset behavior change.
 - Run `python -m ruff check .`, `python -m pytest`, and `python -m build` before completing changes.
+- When changing the TypeScript package in `npm/`, also run `npm ci`, `npm run typecheck`, `npm test`, and `npm run build` there.
 - Keep optional format dependencies lazy-loaded so Markdown and HTML remain usable without them.

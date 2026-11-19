@@ -1,11 +1,12 @@
 # Contributing
 
-1. Use Python 3.10 or later. The Android module requires JDK 17 and Android SDK 35.
+1. Use Python 3.10 or later. The Android module requires JDK 17 and Android SDK 35, and the TypeScript package in `npm` requires Node.js 22.18 or later.
 2. Install Python development dependencies with `python -m pip install -e ".[all,dev]"`.
 3. Add focused tests for behavior changes and update the README for user-facing options.
 4. Run `python -m ruff check .`, `python -m pytest`, and `python -m build`.
 5. Run `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS.
-6. Open a pull request against `main`; GitHub Actions runs the Python checks on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Android tests, build, and lint.
+6. When changing the TypeScript package, run `npm ci`, `npm run typecheck`, `npm test`, and `npm run build` in the `npm` directory.
+7. Open a pull request against `main`; GitHub Actions runs the Python checks on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Android tests, build, and lint and the npm package checks on Node.js 22 and 24.
 
 Document input is untrusted. Keep output escaping and explicit optional-dependency errors intact.
 
