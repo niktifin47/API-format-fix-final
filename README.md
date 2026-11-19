@@ -23,7 +23,7 @@ RTF and ODT readers can also be installed separately with `.[rtf]` and `.[odt]`.
 For a tagged GitHub release, install the wheel directly without publishing this project to PyPI:
 
 ```shell
-python -m pip install "api-format-fix[all] @ https://github.com/niktifin47/document-format-toolkit/releases/download/v0.1.0/api_format_fix-0.1.0-py3-none-any.whl"
+python -m pip install "api-format-fix[all] @ https://github.com/niktifin47/API-format-fix-final/releases/download/v0.1.0/api_format_fix-0.1.0-py3-none-any.whl"
 ```
 
 pip still downloads the optional format dependencies from its configured package index.
