@@ -42,7 +42,7 @@ test("HTML output escapes document content and uses the selected palette", () =>
   const document = parseMarkdown("# <script>alert(1)</script>\n\n**Safe**");
   const rendered = renderDocument(document, "html", { preset: "friendly" });
 
-  assert.doesNotMatch(rendered, /<script>/);
+  assert.doesNotMatch(rendered, /<script\b/i);
   assert.match(rendered, /&lt;script&gt;/);
   assert.match(rendered, /#00695c/);
   assert.match(rendered, /<strong>Safe<\/strong>/);
