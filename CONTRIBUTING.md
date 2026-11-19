@@ -21,18 +21,27 @@ Document input is untrusted. Keep output escaping and explicit optional-dependen
 - All Python tests, including future tests, inherit full assertion diffs, long
   tracebacks, captured output/logs on failure, strict configuration/marker checks,
   a failure/skip summary, and the ten slowest test durations from `pyproject.toml`.
-  Each run writes `reports/pytest.xml` (overwritten on the next run); failed tests'
-  captured output and logs are included, but passing tests' logs are omitted.
-  Do not put credentials or real private documents in test output.
+  Local runs write `reports/pytest.xml` (overwritten on the next run); the
+  OS/version CI jobs use `reports/<python-version>/pytest.xml` to keep reports
+  separate. Failed tests' captured output and logs are included, but passing
+  tests' logs are omitted. Do not put credentials or real private documents in
+  test output.
 - CI keeps the full OS/Python and Linux distribution test coverage, but runs Ruff
-  and the distribution build once in the `quality` job. Pip and Gradle caches
-  reduce repeat setup/build work; superseded workflow runs are cancelled.
+  and the distribution build once in the `quality` job. The five macOS Python
+  versions run independently on one macOS runner to reduce runner queue demand;
+  a failure or timeout in one version does not skip the others and still fails
+  CI. Each macOS version has a three-minute execution timeout and the whole job
+  has a 20-minute limit; GitHub's runner queue is separate and can still delay a
+  job before it starts. Pip and Gradle caches reduce repeat setup/build work;
+  superseded workflow runs are cancelled.
 - Each check job uploads its original logs and reports for 14 days, even on failure.
   Python artifacts are named by OS/version or Linux distribution and include the
   interpreter and installed package versions. Android artifacts include Gradle
   output, JUnit XML/HTML test reports, and lint reports when produced. The final
   `CI` summary lists the outcomes with reproduction guidance; no different-platform
   diagnostic rerun substitutes for the original failure.
+- If a macOS version times out before its normal upload, the failed job also
+  uploads any partial logs as `python-macos-partial-reports`.
 - To reproduce a Python failure, use the same OS, Python version, and dependency
   versions from `environment.txt`, then run
   `python -m pytest "tests/test_file.py::test_name"` with the reported test node ID.
