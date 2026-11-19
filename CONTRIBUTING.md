@@ -42,3 +42,20 @@ Document input is untrusted. Keep output escaping and explicit optional-dependen
   exception/cause/stack-trace logging.
 
 Tagged releases attach Python distributions, a Windows CLI ZIP, and generated Winget manifests. Winget publication requires submitting the generated manifests to Microsoft's `winget-pkgs` repository.
+
+## Merged pull request tracking
+
+The `Record merged pull requests` workflow adds merged PRs to the owner's GitHub
+Project and posts a short metadata-based summary on each PR. It uses the
+repository Actions secret `PROJECT`, a classic token with project and repository
+access; GitHub Actions must also be allowed to create pull requests. The workflow
+opens a separate PR to add each merge to the planning skill, so branch protection
+and review remain in effect. Reviewers may need to resolve conflicts if several
+updates are open at once, and may need to approve CI workflows for PRs created
+with `GITHUB_TOKEN`.
+
+Summary-only PRs are recorded in the project but do not open another summary PR.
+Add their planning-skill entries manually in batches if needed. If a run fails
+after pushing its summary branch but before creating the PR, inspect that branch
+and open the PR manually rather than deleting or overwriting it. The automation
+does not independently assess API impact, test results, or milestone completion.

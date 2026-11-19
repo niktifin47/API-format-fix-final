@@ -59,10 +59,11 @@ PRs or permission errors.
   and check existing comments before posting, including on retries.
 - Add one concise, linked entry for that PR under `Recent merged work` in
   `.github/skills/project-milestone-planning/SKILL.md`, and explain its
-  relevance to outstanding goals. Check for an existing entry first. Preserve
-  uncommitted edits; do not commit, push, or overwrite conflicting work without
-  the user's authorization. The project comment is the detailed record; the
-  skill entry is a short pointer and planning context.
+  relevance to outstanding goals. Check for an existing entry first and remove
+  the placeholder when recording the first merge. Preserve uncommitted edits;
+  do not commit, push, or overwrite conflicting work without the user's
+  authorization. The project comment is the detailed record; the skill entry is
+  a short pointer and planning context.
 - Read back GitHub changes and report links, remaining work, and any partial
   failures. If a result is uncertain, check the remote state before retrying.
   Never silently claim a merge, comment, project update, or file update succeeded.
