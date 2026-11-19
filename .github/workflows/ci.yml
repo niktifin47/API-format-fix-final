@@ -8,7 +8,49 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install quality tools
+        run: |
+          mkdir -p reports
+          python -m pip install -e ".[dev]" 2>&1 | tee reports/install.log
+      - name: Record environment
+        if: ${{ always() }}
+        run: |
+          mkdir -p reports
+          {
+            python -VV
+            python -m pip list --format=freeze
+          } > reports/environment.txt 2>&1
+      - name: Lint
+        run: python -m ruff check . 2>&1 | tee reports/ruff.log
+      - name: Build distributions
+        if: ${{ !cancelled() }}
+        run: python -m build 2>&1 | tee reports/build.log
+      - name: Upload quality diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports
+          path: reports/
+          retention-days: 14
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -21,29 +63,62 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[all,dev]"
-      - run: python -m ruff check .
-      - run: python -m pytest
-      - run: python -m build
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install test dependencies
+        run: |
+          mkdir -p reports
+          python -m pip install -e ".[all,dev]" 2>&1 | tee reports/install.log
+      - name: Record environment
+        if: ${{ always() }}
+        run: |
+          mkdir -p reports
+          {
+            python -VV
+            python -c "import platform; print(platform.platform())"
+            python -m pip list --format=freeze
+          } > reports/environment.txt 2>&1
+      - name: Run tests
+        run: python -m pytest 2>&1 | tee reports/pytest.log
+      - name: Upload test diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-${{ matrix.os }}-${{ matrix.python-version }}-reports
+          path: reports/
+          retention-days: 14
 
   linux-distros:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        image: [ubuntu:22.04, ubuntu:24.04, debian:bookworm, fedora:latest, archlinux:latest]
+        include:
+          - { name: ubuntu-22.04, image: "ubuntu:22.04" }
+          - { name: ubuntu-24.04, image: "ubuntu:24.04" }
+          - { name: debian-bookworm, image: "debian:bookworm" }
+          - { name: fedora, image: "fedora:latest" }
+          - { name: archlinux, image: "archlinux:latest" }
     steps:
       - uses: actions/checkout@v5
+      - name: Cache container Python packages
+        uses: actions/cache@v4
+        with:
+          path: .cache/ci-pip
+          key: distro-${{ matrix.name }}-pip-${{ hashFiles('pyproject.toml') }}
       - name: Test in Linux distribution container
         env:
           IMAGE: ${{ matrix.image }}
         run: |
+          mkdir -p reports .cache/ci-pip
           docker run --rm \
             --volume "$PWD:/workspace" \
+            --volume "$PWD/.cache/ci-pip:/pip-cache" \
             --workdir /workspace \
+            --env PIP_CACHE_DIR=/pip-cache \
             "$IMAGE" \
-            bash -c '
+            bash -euo pipefail -c '
+              cat /etc/os-release > reports/environment.txt
               if command -v apt-get >/dev/null 2>&1; then
                 apt-get update
                 apt-get install -y python3 python3-pip python3-venv
@@ -55,12 +130,19 @@ jobs:
                 PYTHON=python3
               fi
               PYTHON="${PYTHON:-python3}"
+              "$PYTHON" -VV >> reports/environment.txt 2>&1
               "$PYTHON" -m venv /tmp/api-format-fix-venv
               /tmp/api-format-fix-venv/bin/python -m pip install -e ".[all,dev]"
-              /tmp/api-format-fix-venv/bin/python -m ruff check .
+              /tmp/api-format-fix-venv/bin/python -m pip list --format=freeze >> reports/environment.txt
               /tmp/api-format-fix-venv/bin/python -m pytest
-              /tmp/api-format-fix-venv/bin/python -m build
-            '
+            ' 2>&1 | tee reports/container.log
+      - name: Upload container diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.name }}-reports
+          path: reports/
+          retention-days: 14
 
   android:
     runs-on: ubuntu-latest
@@ -70,67 +152,62 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
       - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
-      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - run: bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug --no-daemon
+      - name: Record environment
+        run: |
+          mkdir -p reports
+          {
+            java -version
+            bash ./gradlew --version
+          } > reports/environment.txt 2>&1
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" 2>&1 | tee reports/sdk-install.log
+      - name: Test, build, and lint Android
+        run: |
+          bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug \
+            --no-daemon --build-cache --continue --stacktrace --console=plain 2>&1 | tee reports/gradle.log
+      - name: Upload Android diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-reports
+          path: |
+            reports/
+            android/build/reports/
+            android/build/test-results/
+          retention-days: 14
 
   ci-status:
     name: CI
     if: ${{ always() }}
-    needs: [test, linux-distros, android]
+    needs: [quality, test, linux-distros, android]
     runs-on: ubuntu-latest
     env:
+      QUALITY_RESULT: ${{ needs.quality.result }}
       TEST_RESULT: ${{ needs.test.result }}
       DISTRO_RESULT: ${{ needs.linux-distros.result }}
       ANDROID_RESULT: ${{ needs.android.result }}
     steps:
       - name: Verify CI jobs passed
         run: |
-          if [ "$TEST_RESULT" != "success" ] || [ "$DISTRO_RESULT" != "success" ] || [ "$ANDROID_RESULT" != "success" ]; then
-            echo "test=$TEST_RESULT linux-distros=$DISTRO_RESULT android=$ANDROID_RESULT"
+          {
+            echo "## CI results"
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| Lint and package build | $QUALITY_RESULT |"
+            echo "| Python OS/version matrix | $TEST_RESULT |"
+            echo "| Linux distributions | $DISTRO_RESULT |"
+            echo "| Android | $ANDROID_RESULT |"
+            echo
+            echo "Download the reports artifact for the original failing job: logs, runtime/dependency versions, and test reports."
+            echo 'Python: install `python -m pip install -e ".[all,dev]"` using the failing OS/Python version, then run `python -m pytest "tests/test_file.py::test_name"` with the node ID from the failure summary.'
+            echo 'Android: run `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug --continue --stacktrace --console=plain` (use `.\gradlew.bat` on Windows).'
+            echo "CodeQL is separate; passing tests do not establish security."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$QUALITY_RESULT" != "success" ] || [ "$TEST_RESULT" != "success" ] || [ "$DISTRO_RESULT" != "success" ] || [ "$ANDROID_RESULT" != "success" ]; then
             exit 1
           fi
-
-  failure-diagnostics:
-    if: ${{ always() && (needs.test.result == 'failure' || needs.linux-distros.result == 'failure' || needs.android.result == 'failure') }}
-    needs: [test, linux-distros, android]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install -e ".[all,dev]"
-      - name: Rerun Python checks with detailed diagnostics
-        if: ${{ needs.test.result == 'failure' || needs.linux-distros.result == 'failure' }}
-        shell: bash
-        run: |
-          set +e
-          python -m ruff check . --output-format=concise
-          ruff_status=$?
-          python -m pytest -vv --tb=long
-          pytest_status=$?
-          python -m build
-          build_status=$?
-          {
-            echo "## Python failure diagnostics (Ubuntu / Python 3.12)"
-            echo "| Check | Exit status |"
-            echo "| --- | ---: |"
-            echo "| Ruff | $ruff_status |"
-            echo "| pytest | $pytest_status |"
-            echo "| build | $build_status |"
-            echo
-            echo "Compare this rerun with the original failing OS/Python matrix job; a passing rerun does not rule out a platform-specific failure."
-            echo "Review the independent CodeQL workflow results for security findings. A test/build failure alone does not establish whether a change is safe."
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 0
-      - name: Add Android failure triage guidance
-        if: ${{ needs.android.result == 'failure' }}
-        run: |
-          {
-            echo "## Android failure triage"
-            echo "Review the Android job's first failing Gradle task and its stack trace. Compare with the Android CodeQL workflow result; CI failures are not themselves a security assessment."
-          } >> "$GITHUB_STEP_SUMMARY"
 

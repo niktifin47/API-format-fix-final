@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "api-format-fix"
+description = "Extract, restyle, and convert text across common document formats."
 dynamic = ["version"]
-description = "Extract and restyle text from common document formats."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"
@@ -57,8 +57,11 @@ version = { attr = "api_format_fix.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-ra --tb=long --durations=10 --strict-config --strict-markers --junitxml=reports/pytest.xml"
+verbosity_assertions = 2
+junit_logging = "all"
+junit_log_passing_tests = false
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-
