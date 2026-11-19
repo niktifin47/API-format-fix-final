@@ -57,6 +57,10 @@ version = { attr = "api_format_fix.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-ra --tb=long --durations=10 --strict-config --strict-markers --junitxml=reports/pytest.xml"
+verbosity_assertions = 2
+junit_logging = "all"
+junit_log_passing_tests = false
 
 [tool.ruff]
 line-length = 100
