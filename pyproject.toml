@@ -41,6 +41,11 @@ all = [
 dev = ["pytest>=8", "ruff>=0.6", "build>=1"]
 windows = ["pyinstaller>=6"]
 
+[project.urls]
+Homepage = "https://github.com/niktifin47/document-format-toolkit"
+Repository = "https://github.com/niktifin47/document-format-toolkit"
+PyPI = "https://pypi.org/project/api-format-fix/"
+
 [project.scripts]
 api-format-fix = "api_format_fix.cli:main"
 
