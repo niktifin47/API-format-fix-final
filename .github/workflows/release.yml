@@ -41,8 +41,12 @@ jobs:
   publish:
     needs: [python-distributions, windows-app]
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/api-format-fix
     permissions:
       contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -53,6 +57,10 @@ jobs:
         with:
           name: windows-app
           path: release-assets/windows
+      - name: Publish distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: release-assets/python/
       - name: Generate Winget manifests
         env:
           VERSION: ${{ github.ref_name }}
