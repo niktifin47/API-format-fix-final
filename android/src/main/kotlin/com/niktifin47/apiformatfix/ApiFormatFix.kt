@@ -832,14 +832,27 @@ $headings
 
     private class LimitedWriter(private val maximumChars: Long) : Writer() {
         private val contents = StringBuilder()
+        private var characterCount = 0L
+        private var previousWasHighSurrogate = false
 
         override fun write(buffer: CharArray, offset: Int, length: Int) {
-            if (contents.length.toLong() + length > maximumChars) {
+            var additionalCharacters = 0L
+            var lastWasHighSurrogate = previousWasHighSurrogate
+            for (index in offset until offset + length) {
+                val character = buffer[index]
+                if (!lastWasHighSurrogate || !Character.isLowSurrogate(character)) {
+                    additionalCharacters++
+                }
+                lastWasHighSurrogate = Character.isHighSurrogate(character)
+            }
+            if (characterCount + additionalCharacters > maximumChars) {
                 throw ResourceLimitException(
                     "PDF input extracts more than the configured maxTextChars ($maximumChars).",
                 )
             }
             contents.append(buffer, offset, length)
+            characterCount += additionalCharacters
+            previousWasHighSurrogate = lastWasHighSurrogate
         }
 
         override fun flush() = Unit
