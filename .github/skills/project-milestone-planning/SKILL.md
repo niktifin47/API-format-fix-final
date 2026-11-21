@@ -103,6 +103,8 @@ specific blocker and ask the user to resolve it before continuing.
 
 ## Recent merged work
 
+- [#18](https://github.com/niktifin47/libaryformatAndStyleAndDocumentConversation/pull/18): ci: separate platform support and checks. Milestone: None assigned. API impact and validation not independently assessed. <!-- project-merge-summary:niktifin47/libaryformatAndStyleAndDocumentConversation#18 -->
+
 - [#11](https://github.com/niktifin47/document-format-toolkit/pull/11): ci: track merged PRs in project planning. Milestone: None assigned. API impact and validation not independently assessed. <!-- project-merge-summary:niktifin47/document-format-toolkit#11 -->
 - [#13](https://github.com/niktifin47/document-format-toolkit/pull/13): ci: reduce macOS runner queue pressure. Milestone: None assigned. API impact and validation not independently assessed. <!-- project-merge-summary:niktifin47/document-format-toolkit#13 -->
 
