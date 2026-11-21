@@ -5,7 +5,7 @@ description: Add or adjust document style presets and color schemes in API Forma
 
 # Adding a preset or palette
 
-1. Define immutable values in `src/api_format_fix/models.py`.
+1. Define immutable values in `Linux_MacOs_Windows support/src/api_format_fix/models.py`.
 2. Presets should refer to a registered color scheme by name; palettes must use CSS-compatible hex colors.
 3. Keep defaults consistent across HTML, DOCX, and PDF renderers. PDF can use only its built-in Helvetica or Times family.
 4. Add a test proving the selected preset or custom palette affects rendered output.

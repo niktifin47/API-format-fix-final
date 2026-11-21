@@ -11,6 +11,9 @@ permissions:
 jobs:
   python-distributions:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Linux_MacOs_Windows support
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,10 +24,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: python-distributions
-          path: dist/*
+          path: Linux_MacOs_Windows support/dist/*
 
   windows-app:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Linux_MacOs_Windows support
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,7 +42,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-app
-          path: dist\api-format-fix-windows-x64.zip
+          path: Linux_MacOs_Windows support\dist\api-format-fix-windows-x64.zip
 
   publish:
     needs: [python-distributions, windows-app]
@@ -67,7 +73,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           VERSION="${VERSION#v}"
-          python scripts/create_winget_manifests.py \
+          python "Linux_MacOs_Windows support/scripts/create_winget_manifests.py" \
             --version "$VERSION" \
             --asset release-assets/windows/api-format-fix-windows-x64.zip \
             --release-url "https://github.com/${REPOSITORY}/releases/download/v${VERSION}/api-format-fix-windows-x64.zip" \

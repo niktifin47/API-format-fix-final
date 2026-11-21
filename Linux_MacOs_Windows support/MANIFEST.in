@@ -1,4 +1,3 @@
-include build.gradle.kts gradle.properties settings.gradle.kts gradlew gradlew.bat
-recursive-include android *.kt *.xml *.kts
-recursive-include gradle *.jar *.properties
-prune android/build
+include LICENSE README.md
+include scripts/create_winget_manifests.py
+exclude tests/test_record_merge_summary.py

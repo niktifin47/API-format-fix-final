@@ -1,0 +1,41 @@
+name: Detect platform changes
+description: Identify the platform checks affected by a push or pull request.
+outputs:
+  python:
+    value: ${{ steps.filter.outputs.python }}
+    description: Python checks are required
+  mobile:
+    value: ${{ steps.filter.outputs.mobile }}
+    description: Android checks are required
+  npm:
+    value: ${{ steps.filter.outputs.npm }}
+    description: npm checks are required
+runs:
+  using: composite
+  steps:
+    - uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          python:
+            - 'Linux_MacOs_Windows support/**'
+            - 'scripts/**'
+            - '.github/actions/test-python/**'
+            - '.github/actions/platform-changes/**'
+            - '.github/workflows/ci.yml'
+            - '.github/workflows/codeql.yml'
+            - '.github/workflows/release.yml'
+            - '.github/workflows/merge-project-summary.yml'
+            - 'LICENSE'
+          mobile:
+            - 'mobile development support/**'
+            - '.github/actions/platform-changes/**'
+            - '.github/workflows/ci.yml'
+            - '.github/workflows/codeql.yml'
+            - 'LICENSE'
+          npm:
+            - 'npm package/**'
+            - '.github/actions/platform-changes/**'
+            - '.github/workflows/ci.yml'
+            - '.github/workflows/codeql.yml'
+            - 'LICENSE'

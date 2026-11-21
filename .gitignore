@@ -1,4 +1,4 @@
-# Node.js (npm package in ./npm)
+# Node.js
 node_modules/
 *.tgz
 
@@ -44,7 +44,7 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
-/reports/
+reports/
 htmlcov/
 .tox/
 .nox/
