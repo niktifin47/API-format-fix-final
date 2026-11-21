@@ -56,35 +56,84 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/test-python
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - name: Install test dependencies
+          artifact-name: python-${{ matrix.os }}-${{ matrix.python-version }}-reports
+
+  test-macos:
+    name: test (macos-latest, Python 3.10-3.14)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test Python 3.10
+        id: python310
+        uses: ./.github/actions/test-python
+        continue-on-error: true
+        timeout-minutes: 3
+        with:
+          python-version: "3.10"
+          artifact-name: python-macos-latest-3.10-reports
+      - name: Test Python 3.11
+        id: python311
+        uses: ./.github/actions/test-python
+        continue-on-error: true
+        timeout-minutes: 3
+        with:
+          python-version: "3.11"
+          artifact-name: python-macos-latest-3.11-reports
+      - name: Test Python 3.12
+        id: python312
+        uses: ./.github/actions/test-python
+        continue-on-error: true
+        timeout-minutes: 3
+        with:
+          python-version: "3.12"
+          artifact-name: python-macos-latest-3.12-reports
+      - name: Test Python 3.13
+        id: python313
+        uses: ./.github/actions/test-python
+        continue-on-error: true
+        timeout-minutes: 3
+        with:
+          python-version: "3.13"
+          artifact-name: python-macos-latest-3.13-reports
+      - name: Test Python 3.14
+        id: python314
+        uses: ./.github/actions/test-python
+        continue-on-error: true
+        timeout-minutes: 3
+        with:
+          python-version: "3.14"
+          artifact-name: python-macos-latest-3.14-reports
+      - name: Verify macOS test results
+        if: ${{ !cancelled() }}
+        env:
+          PYTHON_310: ${{ steps.python310.outcome }}
+          PYTHON_311: ${{ steps.python311.outcome }}
+          PYTHON_312: ${{ steps.python312.outcome }}
+          PYTHON_313: ${{ steps.python313.outcome }}
+          PYTHON_314: ${{ steps.python314.outcome }}
         run: |
-          mkdir -p reports
-          python -m pip install -e ".[all,dev]" 2>&1 | tee reports/install.log
-      - name: Record environment
-        if: ${{ always() }}
-        run: |
-          mkdir -p reports
-          {
-            python -VV
-            python -c "import platform; print(platform.platform())"
-            python -m pip list --format=freeze
-          } > reports/environment.txt 2>&1
-      - name: Run tests
-        run: python -m pytest 2>&1 | tee reports/pytest.log
-      - name: Upload test diagnostics
-        if: ${{ always() }}
+          failed=0
+          for result in "3.10:$PYTHON_310" "3.11:$PYTHON_311" "3.12:$PYTHON_312" \
+                        "3.13:$PYTHON_313" "3.14:$PYTHON_314"; do
+            if [ "${result#*:}" != "success" ]; then
+              echo "::error::macOS Python ${result%%:*} did not pass (${result#*:})"
+              failed=1
+            fi
+          done
+          exit "$failed"
+      - name: Upload partial macOS diagnostics
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: python-${{ matrix.os }}-${{ matrix.python-version }}-reports
+          name: python-macos-partial-reports
           path: reports/
           retention-days: 14
 
@@ -183,11 +232,12 @@ jobs:
   ci-status:
     name: CI
     if: ${{ always() }}
-    needs: [quality, test, linux-distros, android]
+    needs: [quality, test, test-macos, linux-distros, android]
     runs-on: ubuntu-latest
     env:
       QUALITY_RESULT: ${{ needs.quality.result }}
       TEST_RESULT: ${{ needs.test.result }}
+      MACOS_RESULT: ${{ needs.test-macos.result }}
       DISTRO_RESULT: ${{ needs.linux-distros.result }}
       ANDROID_RESULT: ${{ needs.android.result }}
     steps:
@@ -198,7 +248,8 @@ jobs:
             echo "| Check | Result |"
             echo "| --- | --- |"
             echo "| Lint and package build | $QUALITY_RESULT |"
-            echo "| Python OS/version matrix | $TEST_RESULT |"
+            echo "| Python Linux/Windows matrix | $TEST_RESULT |"
+            echo "| Python macOS 3.10-3.14 | $MACOS_RESULT |"
             echo "| Linux distributions | $DISTRO_RESULT |"
             echo "| Android | $ANDROID_RESULT |"
             echo
@@ -207,7 +258,7 @@ jobs:
             echo 'Android: run `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug --continue --stacktrace --console=plain` (use `.\gradlew.bat` on Windows).'
             echo "CodeQL is separate; passing tests do not establish security."
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$QUALITY_RESULT" != "success" ] || [ "$TEST_RESULT" != "success" ] || [ "$DISTRO_RESULT" != "success" ] || [ "$ANDROID_RESULT" != "success" ]; then
+          if [ "$QUALITY_RESULT" != "success" ] || [ "$TEST_RESULT" != "success" ] || [ "$MACOS_RESULT" != "success" ] || [ "$DISTRO_RESULT" != "success" ] || [ "$ANDROID_RESULT" != "success" ]; then
             exit 1
           fi
 
