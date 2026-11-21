@@ -15,11 +15,11 @@
   ],
   "license": "BSD-3-Clause",
   "author": "niktifin47",
-  "homepage": "https://github.com/niktifin47/document-format-toolkit/tree/main/npm#readme",
+  "homepage": "https://github.com/niktifin47/document-format-toolkit/tree/main/npm%20package#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/niktifin47/document-format-toolkit.git",
-    "directory": "npm"
+    "directory": "npm package"
   },
   "bugs": {
     "url": "https://github.com/niktifin47/document-format-toolkit/issues"

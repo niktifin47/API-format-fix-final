@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { unzipSync, strFromU8 } from "fflate";
 import { SaxesParser } from "saxes";
@@ -86,7 +87,7 @@ test("DOCX output is reproducible and replaces characters XML cannot hold", asyn
 
 test("DOCX output bytes do not depend on the time zone", () => {
   const hashes = ["UTC", "America/New_York", "Asia/Tokyo", "Pacific/Kiritimati", "Etc/GMT+12"].map((zone) => {
-    const result = spawnSync(process.execPath, [new URL(support("docx-hash.ts")).pathname], {
+    const result = spawnSync(process.execPath, [fileURLToPath(support("docx-hash.ts"))], {
       env: { ...process.env, TZ: zone },
       encoding: "utf8",
     });
@@ -438,7 +439,7 @@ test("missing optional packages produce actionable errors", async () => {
 test("Markdown, HTML, and DOCX work without the optional PDF packages installed", () => {
   const result = spawnSync(
     process.execPath,
-    ["--import", support("block-pdf-packages.ts"), new URL(support("lazy-import.ts")).pathname],
+    ["--import", support("block-pdf-packages.ts"), fileURLToPath(support("lazy-import.ts"))],
     { encoding: "utf8" },
   );
 
