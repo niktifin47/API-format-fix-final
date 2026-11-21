@@ -104,7 +104,7 @@ test("DOCX split runs preserve Unicode and HTML is escaped", async () => {
   const rendered = await formatContent(bytes, ".docx", ".html");
 
   assert.match(rendered, /<p>café &lt;script&gt;alert\(1\)&lt;\/script&gt;<\/p>/);
-  assert.doesNotMatch(rendered, /<script>/);
+  assert.doesNotMatch(rendered, /<script\b/i);
 });
 
 test("DOCX styles map to headings and lists", async () => {
