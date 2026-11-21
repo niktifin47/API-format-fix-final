@@ -451,4 +451,4 @@ def test_in_memory_api_reports_missing_optional_dependencies(
         format_content(input_data, input_format, output_format)
     assert dependency in str(error.value)
     if module in {"striprtf", "odf"}:
-        assert f"api-format-fix[{input_format}]" in str(error.value)
+        assert f"LFSDC[{input_format}]" in str(error.value)
