@@ -18,7 +18,7 @@
             "windows": {
                 "command": ".venv\\Scripts\\python.exe"
             },
-            "args": ["-m", "pip", "install", "-e", ".[all,dev]"],
+            "args": ["-m", "pip", "install", "-e", "./Linux_MacOs_Windows support[all,dev]"],
             "dependsOn": ["Create Python environment"],
             "inAgents": true,
             "runOptions": {
@@ -40,33 +40,36 @@
         {
             "label": "Run Python tests",
             "type": "process",
-            "command": ".venv/bin/python",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "windows": {
-                "command": ".venv\\Scripts\\python.exe"
+                "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe"
             },
             "args": ["-m", "pytest"],
+            "options": { "cwd": "${workspaceFolder}/Linux_MacOs_Windows support" },
             "inAgents": true,
             "problemMatcher": []
         },
         {
             "label": "Lint Python",
             "type": "process",
-            "command": ".venv/bin/python",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "windows": {
-                "command": ".venv\\Scripts\\python.exe"
+                "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe"
             },
             "args": ["-m", "ruff", "check", "."],
+            "options": { "cwd": "${workspaceFolder}/Linux_MacOs_Windows support" },
             "inAgents": true,
             "problemMatcher": []
         },
         {
             "label": "Build Python distributions",
             "type": "process",
-            "command": ".venv/bin/python",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "windows": {
-                "command": ".venv\\Scripts\\python.exe"
+                "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe"
             },
             "args": ["-m", "build"],
+            "options": { "cwd": "${workspaceFolder}/Linux_MacOs_Windows support" },
             "inAgents": true,
             "problemMatcher": []
         },
@@ -90,6 +93,7 @@
                     "--no-daemon"
                 ]
             },
+            "options": { "cwd": "${workspaceFolder}/mobile development support" },
             "inAgents": true,
             "problemMatcher": []
         }

@@ -12,19 +12,53 @@ permissions:
   actions: read
   contents: read
   security-events: write
+  pull-requests: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      has-languages: ${{ steps.matrix.outputs.has-languages }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: platforms
+        if: ${{ github.event_name != 'schedule' }}
+        uses: ./.github/actions/platform-changes
+      - id: matrix
+        shell: bash
+        env:
+          SCHEDULED: ${{ github.event_name == 'schedule' }}
+          PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+          PYTHON: ${{ steps.platforms.outputs.python }}
+          MOBILE: ${{ steps.platforms.outputs.mobile }}
+          NPM: ${{ steps.platforms.outputs.npm }}
+        run: |
+          matrix="$(jq -cn --arg scheduled "$SCHEDULED" --arg pr "$PULL_REQUEST" --arg python "$PYTHON" \
+            --arg mobile "$MOBILE" --arg npm "$NPM" '
+            [
+              if $scheduled == "true" or $python == "true" or
+                ($pr == "true" and $python != "true" and $mobile != "true" and $npm != "true")
+                then {"language":"python","build-mode":"none"} else empty end,
+              if $scheduled == "true" or $mobile == "true" then {"language":"java-kotlin","build-mode":"manual"} else empty end,
+              if $scheduled == "true" or $npm == "true" then {"language":"javascript-typescript","build-mode":"none"} else empty end
+            ]')"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          if [ "$matrix" = '[]' ]; then
+            echo "has-languages=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-languages=true" >> "$GITHUB_OUTPUT"
+          fi
+
   analyze:
+    needs: changes
+    if: ${{ needs.changes.outputs.has-languages == 'true' }}
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - language: python
-            build-mode: none
-          - language: java-kotlin
-            build-mode: manual
+        include: ${{ fromJSON(needs.changes.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v5
 
@@ -50,6 +84,7 @@ jobs:
 
       - name: Build Android library for CodeQL
         if: matrix.language == 'java-kotlin'
+        working-directory: mobile development support
         run: bash ./gradlew :android:assembleDebug --no-daemon
 
       - uses: github/codeql-action/analyze@v4

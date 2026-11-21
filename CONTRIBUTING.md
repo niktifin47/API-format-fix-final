@@ -1,11 +1,12 @@
 # Contributing
 
-1. Use Python 3.10 or later. The Android module requires JDK 17 and Android SDK 35.
-2. Install Python development dependencies with `python -m pip install -e ".[all,dev]"`.
+1. Use Python 3.10 or later. The Android module requires JDK 17 and Android SDK 35, and the TypeScript package requires Node.js 22.18 or later.
+2. In `Linux_MacOs_Windows support`, install Python development dependencies with `python -m pip install -e ".[all,dev]"`.
 3. Add focused tests for behavior changes and update the README for user-facing options.
-4. Run `python -m ruff check .`, `python -m pytest`, and `python -m build`.
-5. Run `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS.
-6. Open a pull request against `main`; GitHub Actions runs the Python checks on Linux, Windows, and macOS with Python 3.10 through 3.14, plus Android tests, build, and lint.
+4. In `Linux_MacOs_Windows support`, run `python -m ruff check .`, `python -m pytest`, and `python -m build`.
+5. In `mobile development support`, run `.\gradlew.bat :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Windows or `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug` on Linux/macOS.
+6. When changing the TypeScript package, run `npm ci`, `npm run typecheck`, `npm test`, and `npm run build` in `npm package`.
+7. Open a pull request against `main`. CI runs the affected platforms' checks and reports skipped platforms in the stable `CI` summary. Changes to shared CI configuration run all checks. CodeQL runs affected languages on changes and all languages weekly. For PRs without platform changes, Python CodeQL still runs to supply the separately required GitHub code-scanning check.
 
 Document input is untrusted. Keep output escaping and explicit optional-dependency errors intact.
 

@@ -1,0 +1,3 @@
+include LICENSE README.md
+include scripts/create_winget_manifests.py
+exclude tests/test_record_merge_summary.py

@@ -1,0 +1,83 @@
+{
+  "name": "@niktifin47/api-format-fix",
+  "version": "0.1.0",
+  "description": "Extract, restyle, and convert text across common document formats in Node.js.",
+  "keywords": [
+    "document",
+    "convert",
+    "markdown",
+    "html",
+    "docx",
+    "pdf",
+    "rtf",
+    "odt",
+    "formatting"
+  ],
+  "license": "BSD-3-Clause",
+  "author": "niktifin47",
+  "homepage": "https://github.com/niktifin47/document-format-toolkit/tree/main/npm%20package#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/niktifin47/document-format-toolkit.git",
+    "directory": "npm package"
+  },
+  "bugs": {
+    "url": "https://github.com/niktifin47/document-format-toolkit/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "api-format-fix": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "htmlparser2": "^12.0.0",
+    "saxes": "^6.0.0"
+  },
+  "peerDependencies": {
+    "pdfjs-dist": ">=5.0.0",
+    "pdfkit": ">=0.17.0"
+  },
+  "peerDependenciesMeta": {
+    "pdfjs-dist": {
+      "optional": true
+    },
+    "pdfkit": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/pdfkit": "^0.17.7",
+    "pdfjs-dist": "^6.5.438",
+    "pdfkit": "^0.20.2",
+    "typescript": "^7.0.2"
+  }
+}

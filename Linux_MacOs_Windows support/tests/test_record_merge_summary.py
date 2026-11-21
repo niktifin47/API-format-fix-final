@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).parents[1] / "scripts" / "record_merge_summary.py"
+SCRIPT = Path(__file__).parents[2] / "scripts" / "record_merge_summary.py"
 spec = importlib.util.spec_from_file_location("record_merge_summary", SCRIPT)
 assert spec is not None and spec.loader is not None
 summary_script = importlib.util.module_from_spec(spec)

@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -17,7 +18,20 @@ defaults:
     shell: bash
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.platforms.outputs.python }}
+      mobile: ${{ steps.platforms.outputs.mobile }}
+      npm: ${{ steps.platforms.outputs.npm }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: platforms
+        uses: ./.github/actions/platform-changes
+
   quality:
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -25,11 +39,11 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: pyproject.toml
+          cache-dependency-path: Linux_MacOs_Windows support/pyproject.toml
       - name: Install quality tools
         run: |
           mkdir -p reports
-          python -m pip install -e ".[dev]" 2>&1 | tee reports/install.log
+          python -m pip install -e "./Linux_MacOs_Windows support[dev]" 2>&1 | tee reports/install.log
       - name: Record environment
         if: ${{ always() }}
         run: |
@@ -42,7 +56,7 @@ jobs:
         run: python -m ruff check . 2>&1 | tee reports/ruff.log
       - name: Build distributions
         if: ${{ !cancelled() }}
-        run: python -m build 2>&1 | tee reports/build.log
+        run: python -m build "Linux_MacOs_Windows support" 2>&1 | tee reports/build.log
       - name: Upload quality diagnostics
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -52,6 +66,8 @@ jobs:
           retention-days: 14
 
   test:
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -66,6 +82,8 @@ jobs:
           artifact-name: python-${{ matrix.os }}-${{ matrix.python-version }}-reports
 
   test-macos:
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
     name: test (macos-latest, Python 3.10-3.14)
     runs-on: macos-latest
     timeout-minutes: 20
@@ -138,6 +156,8 @@ jobs:
           retention-days: 14
 
   linux-distros:
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -154,7 +174,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/ci-pip
-          key: distro-${{ matrix.name }}-pip-${{ hashFiles('pyproject.toml') }}
+          key: distro-${{ matrix.name }}-pip-${{ hashFiles('Linux_MacOs_Windows support/pyproject.toml') }}
       - name: Test in Linux distribution container
         env:
           IMAGE: ${{ matrix.image }}
@@ -181,8 +201,9 @@ jobs:
               PYTHON="${PYTHON:-python3}"
               "$PYTHON" -VV >> reports/environment.txt 2>&1
               "$PYTHON" -m venv /tmp/api-format-fix-venv
-              /tmp/api-format-fix-venv/bin/python -m pip install -e ".[all,dev]"
+              /tmp/api-format-fix-venv/bin/python -m pip install -e "./Linux_MacOs_Windows support[all,dev]"
               /tmp/api-format-fix-venv/bin/python -m pip list --format=freeze >> reports/environment.txt
+              cd "Linux_MacOs_Windows support"
               /tmp/api-format-fix-venv/bin/python -m pytest
             ' 2>&1 | tee reports/container.log
       - name: Upload container diagnostics
@@ -194,6 +215,8 @@ jobs:
           retention-days: 14
 
   android:
+    needs: changes
+    if: ${{ needs.changes.outputs.mobile == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -210,14 +233,15 @@ jobs:
           mkdir -p reports
           {
             java -version
-            bash ./gradlew --version
+            bash "mobile development support/gradlew" --version
           } > reports/environment.txt 2>&1
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0" 2>&1 | tee reports/sdk-install.log
       - name: Test, build, and lint Android
         run: |
+          cd "mobile development support"
           bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug \
-            --no-daemon --build-cache --continue --stacktrace --console=plain 2>&1 | tee reports/gradle.log
+            --no-daemon --build-cache --continue --stacktrace --console=plain 2>&1 | tee ../reports/gradle.log
       - name: Upload Android diagnostics
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -225,21 +249,72 @@ jobs:
           name: android-reports
           path: |
             reports/
-            android/build/reports/
-            android/build/test-results/
+            mobile development support/android/build/reports/
+            mobile development support/android/build/test-results/
+          retention-days: 14
+
+  npm:
+    needs: changes
+    if: ${{ needs.changes.outputs.npm == 'true' }}
+    name: npm (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["22", "24"]
+    defaults:
+      run:
+        shell: bash
+        working-directory: npm package
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: npm package/package-lock.json
+      - name: Install dependencies
+        run: |
+          mkdir -p reports
+          npm ci 2>&1 | tee reports/install.log
+      - name: Record environment
+        if: ${{ always() }}
+        run: |
+          mkdir -p reports
+          { node --version; npm --version; npm ls --all; } > reports/environment.txt 2>&1 || true
+      - name: Type check
+        run: npm run typecheck 2>&1 | tee reports/typecheck.log
+      - name: Test
+        run: npm test 2>&1 | tee reports/test.log
+      - name: Build and inspect package contents
+        if: ${{ !cancelled() }}
+        run: |
+          npm run build 2>&1 | tee reports/build.log
+          npm pack --dry-run 2>&1 | tee reports/pack.log
+      - name: Upload npm diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-node-${{ matrix.node-version }}-reports
+          path: npm package/reports/
           retention-days: 14
 
   ci-status:
     name: CI
     if: ${{ always() }}
-    needs: [quality, test, test-macos, linux-distros, android]
+    needs: [changes, quality, test, test-macos, linux-distros, android, npm]
     runs-on: ubuntu-latest
     env:
+      CHANGES_RESULT: ${{ needs.changes.result }}
+      PYTHON_CHANGED: ${{ needs.changes.outputs.python }}
+      MOBILE_CHANGED: ${{ needs.changes.outputs.mobile }}
+      NPM_CHANGED: ${{ needs.changes.outputs.npm }}
       QUALITY_RESULT: ${{ needs.quality.result }}
       TEST_RESULT: ${{ needs.test.result }}
       MACOS_RESULT: ${{ needs.test-macos.result }}
       DISTRO_RESULT: ${{ needs.linux-distros.result }}
       ANDROID_RESULT: ${{ needs.android.result }}
+      NPM_RESULT: ${{ needs.npm.result }}
     steps:
       - name: Verify CI jobs passed
         run: |
@@ -252,13 +327,24 @@ jobs:
             echo "| Python macOS 3.10-3.14 | $MACOS_RESULT |"
             echo "| Linux distributions | $DISTRO_RESULT |"
             echo "| Android | $ANDROID_RESULT |"
+            echo "| npm (Node 22 and 24) | $NPM_RESULT |"
             echo
             echo "Download the reports artifact for the original failing job: logs, runtime/dependency versions, and test reports."
-            echo 'Python: install `python -m pip install -e ".[all,dev]"` using the failing OS/Python version, then run `python -m pytest "tests/test_file.py::test_name"` with the node ID from the failure summary.'
-            echo 'Android: run `bash ./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug --continue --stacktrace --console=plain` (use `.\gradlew.bat` on Windows).'
+            echo 'Run the affected platform checks from its project folder; see CONTRIBUTING.md.'
             echo "CodeQL is separate; passing tests do not establish security."
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$QUALITY_RESULT" != "success" ] || [ "$TEST_RESULT" != "success" ] || [ "$MACOS_RESULT" != "success" ] || [ "$DISTRO_RESULT" != "success" ] || [ "$ANDROID_RESULT" != "success" ]; then
-            exit 1
-          fi
+          [ "$CHANGES_RESULT" = success ] || exit 1
+          check() {
+            case "$1" in
+              true) [ "$2" = success ] ;;
+              false) [ "$2" = skipped ] ;;
+              *) return 1 ;;
+            esac
+          }
+          check "$PYTHON_CHANGED" "$QUALITY_RESULT" &&
+          check "$PYTHON_CHANGED" "$TEST_RESULT" &&
+          check "$PYTHON_CHANGED" "$MACOS_RESULT" &&
+          check "$PYTHON_CHANGED" "$DISTRO_RESULT" &&
+          check "$MOBILE_CHANGED" "$ANDROID_RESULT" &&
+          check "$NPM_CHANGED" "$NPM_RESULT"
 
