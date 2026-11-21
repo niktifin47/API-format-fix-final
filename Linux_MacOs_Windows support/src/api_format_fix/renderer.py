@@ -222,7 +222,7 @@ def _load_binary_document(
             from striprtf.striprtf import rtf_to_text
         except ImportError as error:
             raise ImportError(
-                "Reading RTF requires striprtf. Install it with `pip install api-format-fix[rtf]`."
+                "Reading RTF requires striprtf. Install it with `pip install LFSDC[rtf]`."
             ) from error
         raw = source.read_bytes() if isinstance(source, Path) else source.read()
         codepage = re.search(rb"\\ansicpg(\d+)", raw)
@@ -250,7 +250,7 @@ def _load_binary_document(
             from odf.teletype import extractText
         except ImportError as error:
             raise ImportError(
-                "Reading ODT requires odfpy. Install it with `pip install api-format-fix[odt]`."
+                "Reading ODT requires odfpy. Install it with `pip install LFSDC[odt]`."
             ) from error
         try:
             odt_document = load(str(source)) if isinstance(source, Path) else load(source)

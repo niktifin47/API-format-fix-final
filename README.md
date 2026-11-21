@@ -23,15 +23,17 @@ RTF and ODT readers can also be installed separately with `.[rtf]` and `.[odt]`.
 Install the package and all optional format dependencies from PyPI:
 
 ```shell
-python -m pip install "api-format-fix[all]"
+python -m pip install "LFSDC[all]"
 ```
 
-pip still downloads the optional format dependencies from its configured package index.
+The distribution is named `LFSDC`; the Python import remains `api_format_fix` and
+the command remains `api-format-fix`. Pip downloads optional format dependencies
+from its configured package index.
 
 For a tagged GitHub release, install the wheel directly from GitHub:
 
 ```shell
-python -m pip install "api-format-fix[all] @ https://github.com/niktifin47/document-format-toolkit/releases/download/v0.1.1/api_format_fix-0.1.1-py3-none-any.whl"
+python -m pip install "LFSDC[all] @ https://github.com/niktifin47/libaryformatAndStyleAndDocumentConversation/releases/download/v0.1.2/lfsdc-0.1.2-py3-none-any.whl"
 ```
 
 ## Quick start
